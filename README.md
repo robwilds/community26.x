@@ -2,6 +2,8 @@
 
 This is a build of Alfresco community 26.x with ldap, a python mcp server and ldap server and other goodies.
 
+https://connect.hyland.com/t5/alfresco-blog/alfresco-community-edition-26-1-release-notes/ba-p/497107
+
 # Getting Started
 
 Run "docker compose up -d" from command line within the root directory of this project.
