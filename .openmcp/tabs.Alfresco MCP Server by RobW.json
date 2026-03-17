@@ -1,0 +1,38 @@
+{
+  "clientId": "db6ef6c9-f6c9-5ef6c95a062-8ef6c95a062d0c0-2d0c0647",
+  "currentIndex": 0,
+  "tabs": [
+    {
+      "name": "Tools",
+      "icon": "icon-tool",
+      "type": "blank",
+      "componentIndex": 2,
+      "storage": {
+        "activeNames": [
+          0
+        ],
+        "autoDetectDiagram": {
+          "edges": [],
+          "views": []
+        },
+        "formData": {
+          "nodeid": "1a0b110f-1e09-4ca2-b367-fe25e4964a4e",
+          "comment": "test comment"
+        },
+        "currentToolName": "addCommentToNode",
+        "lastToolCallResponse": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"entry\":{\"createdAt\":\"2025-11-09T18:38:54.789+0000\",\"createdBy\":{\"enabled\":true,\"firstName\":\"Administrator\",\"displayName\":\"Administrator\",\"email\":\"admin@alfresco.com\",\"emailNotificationsEnabled\":true,\"company\":{},\"id\":\"admin\"},\"edited\":false,\"modifiedAt\":\"2025-11-09T18:38:54.789+0000\",\"canEdit\":true,\"modifiedBy\":{\"enabled\":true,\"firstName\":\"Administrator\",\"displayName\":\"Administrator\",\"email\":\"admin@alfresco.com\",\"emailNotificationsEnabled\":true,\"company\":{},\"id\":\"admin\"},\"canDelete\":true,\"id\":\"b0b9b2c5-9fde-49b7-b9b2-c59fdea9b7a1\",\"content\":\"test comment\"}}"
+            }
+          ],
+          "structuredContent": {
+            "result": "{\"entry\":{\"createdAt\":\"2025-11-09T18:38:54.789+0000\",\"createdBy\":{\"enabled\":true,\"firstName\":\"Administrator\",\"displayName\":\"Administrator\",\"email\":\"admin@alfresco.com\",\"emailNotificationsEnabled\":true,\"company\":{},\"id\":\"admin\"},\"edited\":false,\"modifiedAt\":\"2025-11-09T18:38:54.789+0000\",\"canEdit\":true,\"modifiedBy\":{\"enabled\":true,\"firstName\":\"Administrator\",\"displayName\":\"Administrator\",\"email\":\"admin@alfresco.com\",\"emailNotificationsEnabled\":true,\"company\":{},\"id\":\"admin\"},\"canDelete\":true,\"id\":\"b0b9b2c5-9fde-49b7-b9b2-c59fdea9b7a1\",\"content\":\"test comment\"}}"
+          },
+          "isError": false
+        }
+      }
+    }
+  ]
+}

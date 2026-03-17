@@ -1,0 +1,369 @@
+# This Docker Compose file will spin up an ACS community installation on a local host.
+# It requires at least 6GB of memory available to distribute among containers.
+#
+# For performance tuning, increase each container mem_limit and give a percentage of
+# it to the JVM. Use either the -Xms,-Xmx flags or the newly added flags in
+# java 10+: -XX:MaxRAMPercentage and -XX:MinRAMPercentage.
+# More details here:
+# https://www.oracle.com/technetwork/java/javase/10-relnote-issues-4108729.html
+#
+services:
+  alfresco:
+    #image: docker.io/alfresco/alfresco-content-repository-community:25.2.0
+    image: docker.io/alfresco/alfresco-governance-repository-community:26.1.0
+    mem_limit: 1900m
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -Dencryption.keystore.type=JCEKS
+        -Dencryption.cipherAlgorithm=DESede/CBC/PKCS5Padding
+        -Dencryption.keyAlgorithm=DESede
+        -Dencryption.keystore.location=/usr/local/tomcat/shared/classes/alfresco/extension/keystore/keystore
+        -Dmetadata-keystore.password=mp6yc0UD9e
+        -Dmetadata-keystore.aliases=metadata
+        -Dmetadata-keystore.metadata.password=oKIWzVdEdA
+        -Dmetadata-keystore.metadata.algorithm=DESede
+      JAVA_OPTS: >-
+        -Dactiviti.client.extension.endpoint=http://process:8080/activiti-app
+        -Dactiviti.client.extension.user=admin
+        -Dactiviti.client.extension.password=admin
+        -Ddb.driver=org.postgresql.Driver
+        -Ddb.username=alfresco
+        -Ddb.password=alfresco
+        -Ddb.url=jdbc:postgresql://postgres:5432/alfresco
+        -Dsolr.host=solr6
+        -Dsolr.port=8983
+        -Dsolr.http.connection.timeout=1000
+        -Dsolr.secureComms=secret
+        -Dsolr.sharedSecret=secret
+        -Dsolr.base.url=/solr
+        -Dindex.subsystem.name=solr6
+        -Dshare.host=localhost
+        -Dshare.port=8080
+        -Dalfresco.host=localhost
+        -Dalfresco.port=8080
+        -Dcsrf.filter.enabled=false
+        -Daos.baseUrlOverwrite=http://localhost:8080/alfresco/aos
+        -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
+        -Ddeployment.method=DOCKER_COMPOSE
+        -DlocalTransform.core-aio.url=http://transform-core-aio:8090/
+        -DlocalTransform.pdf-pii.url=http://transform-pii:8090/
+        -XX:MinRAMPercentage=50
+        -XX:MaxRAMPercentage=80
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8080/alfresco/api/-default-/public/alfresco/versions/1/probes/-ready-",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 1m
+    volumes:
+      - ./data/services/content/alfresco-global.properties:/usr/local/tomcat/shared/classes/alfresco-global.properties
+      - ./data/services/content/index.jsp:/usr/local/tomcat/webapps/ROOT/index.jsp
+      - alf_data:/usr/local/tomcat/alf_data/
+    extends:
+      file: commons/base.yaml
+      service: alfresco
+  transform-core-aio:
+    image: alfresco/alfresco-transform-core-aio:5.4.0
+    #image: alfresco-tengine-pii
+    mem_limit: 1536m
+    environment:
+      JAVA_OPTS: >-
+        -XX:MinRAMPercentage=50
+        -XX:MaxRAMPercentage=80
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/ready"]
+      interval: 20s
+      timeout: 2s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      activemq:
+        condition: service_healthy
+  share:
+    #image: docker.io/alfresco/alfresco-share:25.2.0
+    image: docker.io/alfresco/alfresco-governance-share-community:26.1.0
+    mem_limit: 1g
+    environment:
+      CSRF_FILTER_ORIGIN: http://localhost:8080
+      CSRF_FILTER_REFERER: http://localhost:8080/share/.*
+      REPO_HOST: "alfresco"
+      REPO_PORT: "8080"
+      JAVA_OPTS: >-
+        -XX:MinRAMPercentage=50
+        -XX:MaxRAMPercentage=80
+        -Dalfresco.host=localhost
+        -Dalfresco.port=8080
+        -Dalfresco.context=alfresco
+        -Dalfresco.protocol=http
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/share"]
+      interval: 20s
+      timeout: 2s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      alfresco:
+        condition: service_healthy
+    extends:
+      file: commons/base.yaml
+      service: share
+  postgres:
+    image: postgres:17.9
+    mem_limit: 512m
+    environment:
+      - POSTGRES_PASSWORD=alfresco
+      - POSTGRES_USER=alfresco
+      - POSTGRES_DB=alfresco
+    command: postgres -c max_connections=300 -c log_min_messages=LOG
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+  solr6:
+    image: docker.io/alfresco/alfresco-search-services:2.0.18
+    mem_limit: 2g
+    environment:
+      # Solr needs to know how to register itself with Alfresco
+      SOLR_ALFRESCO_HOST: "alfresco"
+      SOLR_ALFRESCO_PORT: "8080"
+      # Alfresco needs to know how to call solr
+      SOLR_SOLR_HOST: "solr6"
+      SOLR_SOLR_PORT: "8983"
+      # Create the default alfresco and archive cores
+      SOLR_CREATE_ALFRESCO_DEFAULTS: "alfresco,archive"
+      # HTTPS or SECRET
+      ALFRESCO_SECURE_COMMS: "secret"
+      # SHARED SECRET VALUE
+      JAVA_TOOL_OPTIONS: >-
+        -Dalfresco.secureComms.secret=secret
+    ports:
+      - "8083:8983" # Browser port
+  activemq:
+    image: alfresco/alfresco-activemq:6.2.1-jre17-rockylinux8
+    mem_limit: 1g
+    ports:
+      - "8161:8161" # Web Console
+      - "5672:5672" # AMQP
+      - "61616:61616" # OpenWire
+      - "61613:61613" # STOMP
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/activemq/bin/activemq",
+          "query",
+          "--objname",
+          "type=Broker,brokerName=*,service=Health",
+          "|",
+          "grep",
+          "Good",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+  content-app:
+    image: alfresco/alfresco-content-app:7.3.0
+    mem_limit: 128m
+    environment:
+      APP_BASE_SHARE_URL: "http://localhost:8080/aca/#/preview/s"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+    extends:
+      file: commons/base.yaml
+      service: content-app
+    profiles:
+      - donotstart
+  control-center:
+    image: quay.io/alfresco/alfresco-control-center:10.3.0
+    mem_limit: 128m
+    environment:
+      APP_CONFIG_PROVIDER: "ECM"
+      APP_CONFIG_AUTH_TYPE: "BASIC"
+      BASE_PATH: ./
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://alfresco:8080/"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+    extends:
+      file: commons/base.yaml
+      service: control-center
+    profiles:
+      - donotstart
+  proxy:
+    extends:
+      file: commons/base.yaml
+      service: proxy
+  ##########CUSTOM SERVICES BELOW##########
+  # transform-pii:
+  #   image: alfresco/transform-pii-redaction
+  dozzle:
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 9999:8080
+    profiles:
+      - donotstart
+  queryalfapi:
+    image: wildsdocker/queryalfapi:v3
+    ports:
+      - 9600:9600
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 8G
+        reservations:
+          memory: 0G
+    volumes:
+      # downloaded shards
+      - ./data/services/queryalfapi/LLMs/:/root/.cache/
+      # map to static folder namely where swagger json is located
+      - ./data/services/queryalfapi/static/:/python-docker/static
+    #depends_on:
+    #alfresco:
+    #condition: service_healthy
+    environment:
+      BASE_URL: "http://alfresco:8080"
+      API_URL: "/static/swagger.json"
+      user: "admin"
+      pass: "admin"
+      devpath: "../src/assets/"
+      prodpath: "./static/"
+      port: "9600"
+      elasticapikey: "local"
+      elastichost: "http://elasticsearch:9200"
+      elasticcloudid: "123445"
+      elasticuser: "enterprise_search"
+      elasticpassword: "hylandforce1"
+      baseFilePlanID: ""
+      baseFilePlanQuery: '{"query": {"query": "select * from rma:filePlan","language": "cmis"}}'
+      OPEN_API_KEY: ""
+      HUGGING_FACE_HUB_TOKEN: ""
+      microsoft_model: "microsoft/Florence-2-base"
+      llama_vision_model: "unsloth/Llama-3.2-11B-Vision-Instruct"
+      llama_chat_repo: "hugging-quants/Llama-3.2-3B-Instruct-Q4_K_M-GGUF"
+      llama_chat_filename: "llama-3.2-3b-instruct-q4_k_m.gguf"
+    profiles:
+      - donotstart
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main # Or :cuda for GPU support
+    ports:
+      - "3000:8080" # Host_port:Container_port
+    volumes:
+      - ./data/services/openwebui:/app/backend/data # Persistent storage for Open WebUI data
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434 # Link to the Ollama service on the host
+    #depends_on:
+    #  - mcpo
+    #profiles:
+    #  - donotstart
+  mcpo:
+    image: ghcr.io/open-webui/mcpo:main
+    ports:
+      - 8001:8000
+    command: mcpo --server-type "streamable-http" -- http://wildsalfmcp:8000/mcp
+    depends_on:
+      wildsalfmcp:
+        condition: service_healthy # Ensures the mcp server starts before mcpo server otherwise it will crash
+    profiles:
+      - donotstart
+  wildsalfmcp:
+    image: wildsdocker/wildsalfmcp:v3
+    ports:
+      - 8000:8000
+      - 8443:443
+      - 8880:80
+    environment:
+      BASE_URL: "http://alfresco:8080"
+      user: "admin"
+      pass: "admin"
+      FASTMCP_HOST: 0.0.0.0
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo -n '' > /dev/tcp/127.0.0.1/8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    #profiles:
+    #- donotstart
+  ldap:
+    image: bitnamilegacy/openldap:latest
+    ports:
+      - 389:389
+      - 636:636
+    environment:
+      - LDAP_PORT_NUMBER=389
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=admin
+      - LDAP_ADMIN_DN=cn=admin,dc=example,dc=com
+      - LDAP_ROOT=dc=example,dc=com
+      - LDAP_USERS=demo
+      - LDAP_PASSWORDS=demo
+      - LDAP_PASSWORD_HASH={CLEARTEXT}
+      - LDAP_CUSTOM_LDIF_DIR=/home
+    volumes:
+      - ./data/services/bitnamildap:/bitnami/openldap
+      - type: bind
+        source: ./data/services/bitnamildap/init.ldif
+        target: /home/init.ldif
+  ldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    environment:
+      - PHPLDAPADMIN_LDAP_HOSTS=ldap
+      - PHPLDAPADMIN_HTTPS=false
+    ports:
+      - 6443:443
+      - 8400:80
+    profiles:
+      - donotstart
+  email:
+    #image: apache/james:memory-latest
+    image: apache/james:demo-3.8.2
+    ports:
+      - 25:25
+      - 465:465
+      - 993:993
+      - 143:143
+      - 8500:8000
+    volumes:
+      #- ./data/services/email/domainlist.xml:/root/conf/domainlist.xml
+      - ./data/services/email/initialdata.sh:/root/initialdata.sh
+      - type: bind
+        source: ./data/services/email/derby/
+        target: /var/store/
+    profiles:
+      - donotstart
+  webmail:
+    image: hardware/rainloop:latest
+    volumes:
+      - ./data/services/webmail:/rainloop/data
+    ports:
+      - 8800:8888
+    depends_on:
+      - email
+    profiles:
+      - donotstart
+volumes:
+  alf_data:
+  postgresdata:

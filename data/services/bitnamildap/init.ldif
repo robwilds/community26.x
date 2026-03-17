@@ -1,0 +1,29 @@
+version: 1
+
+dn: dc=example,dc=com
+objectClass: dcObject
+objectClass: organization
+o: Example Alfresco Corp
+dc: example
+
+dn: ou=groups,dc=example,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: groups
+
+dn: ou=users,dc=example,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: users
+
+dn: uid=demo,ou=users,dc=example,dc=com
+objectclass: top
+objectclass: inetOrgPerson
+objectclass: person
+objectclass: organizationalPerson
+cn: demo
+givenname: Demo
+mail: demo@example.com
+sn: User
+uid: demo
+userpassword: demo
