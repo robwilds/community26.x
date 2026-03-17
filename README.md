@@ -1,6 +1,6 @@
 # Info
 
-This is a build of Alfresco community 26.x with ldap, a python mcp server and other goodies
+This is a build of Alfresco community 26.x with ldap, a python mcp server and ldap server and other goodies.
 
 # Getting Started
 
