@@ -1,12 +1,16 @@
+# Info
+
+This is a build of Alfresco community 26.x with ldap, a python mcp server and other goodies
+
 # Getting Started
 
-Run docker compose start from command line within the root directory of this project.
+Run "docker compose up -d" from command line within the root directory of this project.
 
-Login with admin/admin.
+Login with demo/demo.
 
 After services start you can run ./install_all.sh in the root to load up
 OOTBEE tools (https://github.com/OrderOfTheBee/ootbee-support-tools)
-and a mechanism to execcute httpclient style transactions from a javascript in a rule.
+and a mechanism to execute httpclient style transactions from a javascript in a rule. There's also a custom hyland theme jar - select the theme from the admin view
 
 Pretty straight forward...
 
