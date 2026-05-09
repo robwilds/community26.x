@@ -16,8 +16,24 @@ and a mechanism to execute httpclient style transactions from a javascript in a 
 
 Pretty straight forward...
 
+## Alfresco Manager
+
+A web UI at `mgr/` for managing installed JARs and AMPs without using the CLI.
+
+```
+python3 mgr/server.py
+```
+
+Opens on http://localhost:9700 with:
+
+- **Status panel** — health check for both Alfresco and Share containers, with a Restart All button
+- **AMPs tab** — lists installed modules (with title, version, ID) and pending AMPs in the container's amps directory
+- **JARs tab** — lists all JARs in WEB-INF/lib with per-file Remove button (deletes from container, requires restart to take effect)
+- **Available Files tab** — shows files in `installs/content/` and `installs/share/` with one-click Install AMP / Install JAR buttons. JARs are copied directly to WEB-INF/lib. AMPs are copied then installed via MMT (Module Management Tool).
+- Auto-refreshes container status every 10 seconds. Uses zero dependencies (vanilla JS, Python stdlib only).
+
 ### note
 
-There's a container called wildsalfmcp that will start up an MCP server for use with coPilot or Clause desktop etc.
+There's a container called wildsalfmcp that will start up an MCP server for use with coPilot or Claude desktop etc.
 
 If you want to run a local model with a dedicated chat client, you must install ollama on your computer. Once installed pull a model in terminal (ollama pull llama3). The start (or restart) the doocker services. You can access the open-webui interface with http://localhost:3000. Configure the tools under settings to point to http://localhost:8001

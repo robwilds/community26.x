@@ -1,0 +1,52 @@
+# Session Memory
+
+## Project
+Alfresco Community 26.x local dev stack — Docker Compose with Alfresco, Share, Solr, ActiveMQ, PostgreSQL, LDAP, AI services.
+
+## Prompts & Actions
+
+### 1. Analyze the codebase
+Explored the project structure — Docker Compose stack, installs directory, configs, custom services (wildsalfmcp, queryalfapi, Open WebUI).
+
+### 2. Review install_all.sh
+Identified issues: hardcoded container names, hardcoded MMT version, no container restart after install, no error handling, `--user root` missing for AMP install (webapps owned by root but container runs as `alfresco` user).
+
+### 3. Fix install_all.sh
+Rewrote script with:
+- Dynamic container name discovery via `docker compose ps` + `docker inspect`
+- Dynamic MMT version discovery via glob inside container
+- `--user root` on MMT install command
+- Container restart after install
+- Health wait loop after restart
+- `set -euo pipefail` and project root validation
+
+### 4. Run install_all.sh
+Ran the script — installed 3 JARs + 1 AMP to alfresco, 1 JAR + 1 AMP to share. Initial run revealed the `--user root` bug (IO error on AMP install). Fixed and re-ran successfully.
+
+### 5. Create management UI
+Created `mgr/server.py` (Python stdlib HTTP server) and `mgr/static/index.html` (vanilla JS) — a dark-themed web interface on port 9700 with:
+- Container health status
+- Installed AMPs + pending AMPs view (alfresco/share tabs)
+- JAR listing with remove button
+- Local files from `installs/` with one-click Install AMP / Install JAR
+- Restart All button
+
+### 6. Start manager
+Ran server on localhost:9700.
+
+### 7. Update README
+Added "Alfresco Manager" section documenting the mgr/ tool, its features, and how to start it.
+
+## Files Created/Modified
+- `install_all.sh` — rewritten (dynamic container/MMT detection, root user, restart, health wait)
+- `mgr/server.py` — management API server
+- `mgr/static/index.html` — management UI
+- `README.md` — added Alfresco Manager section
+- `MEMORY.md` — this file
+
+## Key Decisions
+- Management server uses Python stdlib only (zero dependencies)
+- UI uses vanilla JS (no framework)
+- Manager runs outside Docker (talks to Docker socket via CLI)
+- AMP install requires `--user root` due to filesystem ownership in containers
+- Script auto-discovers container names to be project-name agnostic
