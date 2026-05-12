@@ -132,11 +132,16 @@
 <div class="header">
   <h1><span>alfresco</span> manager</h1>
   <div class="header-actions">
-    <span id="status-alfresco" class="badge"><span class="status-dot"></span>loading</span>
-    <span id="status-share" class="badge"><span class="status-dot"></span>loading</span>
+    <span id="services-summary" class="badge">loading</span>
+    <button class="btn btn-primary btn-sm" onclick="startAll()">Start All</button>
     <button class="btn btn-primary btn-sm" onclick="restartAll()">Restart All</button>
     <button class="btn btn-outline btn-sm" onclick="refreshAll()">Refresh</button>
   </div>
+</div>
+
+<div class="card full" style="margin-bottom:16px">
+  <h2>Services <small>docker compose</small></h2>
+  <div id="services-list"></div>
 </div>
 
 <div class="grid">
@@ -199,15 +204,42 @@ function switchTab(group, target, el) {
   document.getElementById(`${group}-${target}`).classList.add('active');
 }
 
-async function refreshStatus() {
-  const data = await api('/api/status');
-  for (const svc of ['alfresco', 'share']) {
-    const el = document.getElementById(`status-${svc}`);
-    const s = data[svc];
-    const h = s.health;
-    el.className = `badge ${h === 'healthy' ? 'healthy' : 'unhealthy'}`;
-    el.innerHTML = `<span class="status-dot ${h === 'healthy' ? 'healthy' : 'unhealthy'}"></span>${svc}: ${h}`;
+async function refreshServices() {
+  const data = await api('/api/services');
+  const total = data.length;
+  const running = data.filter(s => s.running).length;
+  const summary = document.getElementById('services-summary');
+  summary.className = `badge ${running === total ? 'healthy' : total > 0 ? 'unhealthy' : 'not-found'}`;
+  summary.innerHTML = `<span class="status-dot ${running === total ? 'healthy' : total > 0 ? 'unhealthy' : 'not-found'}"></span>${running}/${total} running`;
+
+  const el = document.getElementById('services-list');
+  let html = '<table><thead><tr><th>Service</th><th>Status</th><th></th></tr></thead><tbody>';
+  for (const s of data) {
+    const statusClass = s.running ? 'healthy' : 'not-found';
+    const statusLabel = s.running ? 'running' : 'stopped';
+    const profileTag = s.profile ? ' <span class="badge not-found" style="font-size:9px;vertical-align:middle">profile: donotstart</span>' : '';
+    const name = escAttr(s.name);
+    const startBtn = `<button class="btn btn-primary btn-sm" onclick="svcAction('start','${name}')">Start</button>`;
+    const stopBtn = `<button class="btn btn-danger btn-sm" onclick="svcAction('stop','${name}')">Stop</button>`;
+    const restartBtn = `<button class="btn btn-outline btn-sm" onclick="svcAction('restart','${name}')">Restart</button>`;
+    const actions = s.running ? `${restartBtn} ${stopBtn}` : startBtn;
+    html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}</td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
   }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+  return data;
+}
+
+async function svcAction(action, name) {
+  showToast(`${action} ${name}...`, 'info');
+  const endpoint = `/api/${action}`;
+  const res = await api(endpoint, {
+    method: 'POST',
+    body: JSON.stringify({ containers: [name] }),
+  });
+  const msg = res[name] || `${action}ed`;
+  showToast(`${name}: ${msg}`, msg.startsWith('failed') ? 'error' : 'success');
+  setTimeout(refreshServices, 3000);
 }
 
 async function refreshAmps() {
@@ -243,14 +275,6 @@ function renderAmps(svc, data) {
     html += '</div>';
   }
   el.innerHTML = html;
-}
-
-async function refreshJars() {
-  const data = await api('/api/jars');
-  state.jars = data;
-  for (const svc of ['alfresco', 'share']) {
-    renderJars(svc, data[svc]);
-  }
 }
 
 async function refreshJars() {
@@ -350,6 +374,20 @@ async function removeJar(svc, filename) {
   }
 }
 
+async function startAll() {
+  const btn = event.target; btn.disabled = true;
+  showToast('Starting all containers...', 'info');
+  const res = await api('/api/start', {
+    method: 'POST',
+    body: JSON.stringify({ containers: [] }),
+  });
+  btn.disabled = false;
+  const entries = Object.entries(res);
+  const ok = entries.filter(([,v]) => v === 'started').length;
+  showToast(`${ok}/${entries.length} containers started`, 'info');
+  setTimeout(refreshAll, 5000);
+}
+
 async function restartAll() {
   const btn = event.target; btn.disabled = true;
   showToast('Restarting containers...', 'info');
@@ -363,14 +401,14 @@ async function restartAll() {
 }
 
 async function refreshAll() {
-  await Promise.all([refreshStatus(), refreshAmps(), refreshJars(), refreshFiles()]);
+  await Promise.all([refreshServices(), refreshAmps(), refreshJars(), refreshFiles()]);
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 
 refreshAll();
-setInterval(refreshStatus, 10000);
+setInterval(refreshServices, 10000);
 </script>
 </body>
 </html>

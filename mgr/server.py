@@ -44,6 +44,64 @@ def detect_containers():
             SHARE_CONTAINER = r2.stdout.strip().lstrip("/")
 
 
+def list_services():
+    r = run(
+        ["docker", "compose", "config", "--services"],
+        cwd=str(PROJECT_ROOT),
+    )
+    if r.returncode != 0:
+        return []
+    services = r.stdout.strip().splitlines()
+    r2 = run(
+        ["docker", "compose", "ps", "--format", "json"],
+        cwd=str(PROJECT_ROOT),
+    )
+    running = set()
+    if r2.returncode == 0 and r2.stdout.strip():
+        import json as _json
+        for line in r2.stdout.strip().splitlines():
+            try:
+                info = _json.loads(line)
+                if info.get("State") == "running":
+                    running.add(info.get("Service"))
+            except Exception:
+                pass
+    result = []
+    profiles = _parse_compose_profiles()
+    for s in services:
+        result.append({
+            "name": s,
+            "running": s in running,
+            "profile": s in profiles.get("donotstart", []),
+        })
+    return result
+
+
+def _parse_compose_profiles():
+    profiles = {}
+    try:
+        text = Path(PROJECT_ROOT / "docker-compose.yaml").read_text()
+        import re
+        current = None
+        in_profiles = False
+        for line in text.splitlines():
+            m = re.match(r"^  (\S+):", line)
+            if m and not line.startswith("   "):
+                current = m.group(1)
+                in_profiles = False
+            if current and "profiles:" in line:
+                in_profiles = True
+                continue
+            if in_profiles and re.match(r"^\s+- ", line):
+                p = line.strip().lstrip("- ")
+                profiles.setdefault(p, []).append(current)
+            elif in_profiles and line.strip() and not line.startswith(" " * 6):
+                in_profiles = False
+    except Exception:
+        pass
+    return profiles
+
+
 def read_file(path):
     try:
         return Path(path).read_text()
@@ -231,16 +289,37 @@ def do_remove_jar(container, filename):
     return {"error": f"remove failed: {r.stderr or r.stdout}"}
 
 
+def do_start(containers):
+    results = {}
+    cmd = ["docker", "compose", "up", "-d"]
+    if containers:
+        cmd += containers
+    else:
+        containers = [s["name"] for s in list_services()]
+    r = run(cmd, cwd=str(PROJECT_ROOT), timeout=120)
+    status = "started" if r.returncode == 0 else f"failed: {r.stderr}"
+    for c in containers:
+        results[c] = status
+    return results
+
+
+def do_stop(containers):
+    results = {}
+    cmd = ["docker", "compose", "stop"] + containers
+    r = run(cmd, cwd=str(PROJECT_ROOT), timeout=60)
+    status = "stopped" if r.returncode == 0 else f"failed: {r.stderr}"
+    for c in containers:
+        results[c] = status
+    return results
+
+
 def do_restart(containers):
     results = {}
+    cmd = ["docker", "compose", "restart"] + containers
+    r = run(cmd, cwd=str(PROJECT_ROOT), timeout=60)
+    status = "restarted" if r.returncode == 0 else f"failed: {r.stderr}"
     for c in containers:
-        if c in ("alfresco", "share"):
-            cname = ALFRESCO_CONTAINER if c == "alfresco" else SHARE_CONTAINER
-            if not cname:
-                results[c] = "not found"
-                continue
-            r = run(["docker", "restart", cname], timeout=60)
-            results[c] = "restarted" if r.returncode == 0 else f"failed: {r.stderr}"
+        results[c] = status
     return results
 
 
@@ -344,6 +423,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     files["share"].append(f.name)
             return send_json(self, files)
 
+        if path == "/api/services":
+            return send_json(self, list_services())
+
         send_json(self, {"error": "not found"}, 404)
 
     def do_POST(self):
@@ -353,8 +435,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         detect_containers()
 
-        if parsed.path == "/api/restart":
+        if parsed.path == "/api/start":
             targets = body.get("containers", ["alfresco", "share"])
+            result = do_start(targets)
+            return send_json(self, result)
+
+        if parsed.path == "/api/stop":
+            targets = body.get("containers", [])
+            if not targets:
+                return send_json(self, {"error": "containers required"}, 400)
+            result = do_stop(targets)
+            return send_json(self, result)
+
+        if parsed.path == "/api/restart":
+            targets = body.get("containers", [])
+            if not targets:
+                return send_json(self, {"error": "containers required"}, 400)
             result = do_restart(targets)
             return send_json(self, result)
 

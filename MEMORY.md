@@ -37,6 +37,18 @@ Ran server on localhost:9700.
 ### 7. Update README
 Added "Alfresco Manager" section documenting the mgr/ tool, its features, and how to start it.
 
+### 8. Add start option to mgr
+Added `/api/start` POST endpoint and "Start All" button to the manager UI.
+
+### 9. Reference docker-compose.yaml for start
+Changed `do_start` to run `docker compose up -d` (no service filter) so all compose services start, not just alfresco/share.
+
+### 10. Services panel with per-container control
+Added `/api/services` endpoint that lists all services from `docker-compose.yaml` with running status and donotstart profile info. New Services card in UI shows every container with Start/Stop/Restart buttons. Header shows running/total summary.
+
+### 11. Stop + Restart per service
+Added `do_stop()` (`docker compose stop`) and switched `do_restart()` to `docker compose restart` so any service can be controlled. Added `/api/stop` endpoint. UI now shows Start (stopped) or Restart+Stop (running) per service row.
+
 ## Files Created/Modified
 - `install_all.sh` — rewritten (dynamic container/MMT detection, root user, restart, health wait)
 - `mgr/server.py` — management API server
@@ -50,3 +62,5 @@ Added "Alfresco Manager" section documenting the mgr/ tool, its features, and ho
 - Manager runs outside Docker (talks to Docker socket via CLI)
 - AMP install requires `--user root` due to filesystem ownership in containers
 - Script auto-discovers container names to be project-name agnostic
+- Services panel reads compose file directly via `docker compose config --services` + YAML profile parsing
+- Service control uses `docker compose` subcommands (up/stop/restart) rather than raw `docker` commands for compose-aware orchestration
