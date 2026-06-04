@@ -4,19 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alfresco Control Plane</title>
-<style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/static/hyland-icon.svg" type="image/svg+xml">
+  <style>
   :root {
     --bg: #0f1117;
     --card: #1a1d27;
     --border: #2a2d3a;
     --text: #e1e4eb;
     --muted: #8b8fa3;
-    --accent: #4f8cff;
-    --accent2: #6c5ce7;
+    --accent: #6E33FF;
+    --accent2: #52A1FF;
     --green: #2ed573;
     --red: #ff4757;
     --orange: #ffa502;
-    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, monospace;
+    --hyland-teal: #13eac1;
+    --hyland-gold: #f1cb61;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, monospace;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -200,7 +206,11 @@
 </div>
 
 <div class="header">
-  <h1><span>alfresco</span> control plane</h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <img src="/static/hyland-logo.svg" alt="Hyland" height="28">
+    <div style="width:1px;height:28px;background:var(--border)"></div>
+    <h1 style="margin:0;font-size:18px;font-weight:500;color:var(--muted)"><span style="color:var(--text);font-weight:600">alfresco</span> control plane</h1>
+  </div>
   <div class="header-actions">
     <span id="services-summary" class="badge">loading</span>
     <button class="btn btn-primary btn-sm" onclick="startAll()">Start All</button>

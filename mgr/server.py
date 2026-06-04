@@ -404,7 +404,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/" or path == "/index.html":
             return send_html(self, str(STATIC_DIR / "index.html"))
         if path.startswith("/static/"):
-            return send_html(self, str(PROJECT_ROOT / path.lstrip("/")))
+            return send_html(self, str(STATIC_DIR / path.split("/", 2)[-1]))
 
         if path == "/api/status":
             detect_containers()
