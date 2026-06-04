@@ -16,6 +16,11 @@ ALFRESCO_CONTAINER = None
 SHARE_CONTAINER = None
 
 
+def docker_is_running():
+    r = run(["docker", "info"], timeout=5)
+    return r.returncode == 0
+
+
 def run(cmd, **kwargs):
     return subprocess.run(
         cmd, capture_output=True, text=True, timeout=kwargs.pop("timeout", 30), **kwargs
@@ -216,7 +221,7 @@ def do_install_amp(container, filename):
     amps_dir = "amps" if "alfresco" in container else "amps_share"
     webapp = "alfresco" if "alfresco" in container else "share"
     # copy from local installs dir to container amps dir
-    local_path = Path("installs") / ("content" if "alfresco" in container else "share") / filename
+    local_path = PROJECT_ROOT / "installs" / ("content" if "alfresco" in container else "share") / filename
     if not local_path.exists():
         return {"error": f"file not found: {local_path}"}
     r = run(["docker", "cp", str(local_path), f"{container}:/usr/local/tomcat/{amps_dir}/"])
@@ -253,7 +258,7 @@ def do_install_jar(container, filename):
     if not container:
         return {"error": "container not found"}
     webapp = "alfresco" if "alfresco" in container else "share"
-    local_path = Path("installs") / ("content" if "alfresco" in container else "share") / filename
+    local_path = PROJECT_ROOT / "installs" / ("content" if "alfresco" in container else "share") / filename
     if not local_path.exists():
         return {"error": f"file not found: {local_path}"}
     r = run(
@@ -305,6 +310,8 @@ def do_start(containers):
 
 def do_stop(containers):
     results = {}
+    if not containers:
+        containers = [s["name"] for s in list_services()]
     cmd = ["docker", "compose", "stop"] + containers
     r = run(cmd, cwd=str(PROJECT_ROOT), timeout=60)
     status = "stopped" if r.returncode == 0 else f"failed: {r.stderr}"
@@ -426,6 +433,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/services":
             return send_json(self, list_services())
 
+        if path == "/api/docker-status":
+            return send_json(self, {"running": docker_is_running()})
+
         send_json(self, {"error": "not found"}, 404)
 
     def do_POST(self):
@@ -442,8 +452,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         if parsed.path == "/api/stop":
             targets = body.get("containers", [])
-            if not targets:
-                return send_json(self, {"error": "containers required"}, 400)
             result = do_stop(targets)
             return send_json(self, result)
 
@@ -453,6 +461,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return send_json(self, {"error": "containers required"}, 400)
             result = do_restart(targets)
             return send_json(self, result)
+
+        if parsed.path == "/api/launch-docker":
+            import shutil
+            dockercmd = shutil.which("open") and "open -a Docker" or shutil.which("docker")
+            if dockercmd:
+                run(shlex.split(dockercmd), timeout=10)
+                return send_json(self, {"success": True})
+            return send_json(self, {"error": "no way to launch Docker found"}, 400)
 
         if parsed.path == "/api/install/jar":
             container = body.get("container")

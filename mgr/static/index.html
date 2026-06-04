@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alfresco Manager</title>
+<title>Alfresco Control Plane</title>
 <style>
   :root {
     --bg: #0f1117;
@@ -126,14 +126,49 @@
     border-radius: 4px; font-size: 11px; font-family: 'SF Mono', monospace;
   }
   .file-item .btn { padding: 2px 6px; font-size: 10px; }
+
+  .docker-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.7); display: flex;
+    align-items: center; justify-content: center;
+  }
+  .docker-overlay.hidden { display: none; }
+  .docker-overlay .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px; max-width: 440px;
+    text-align: center;
+  }
+  .docker-overlay .modal h2 { font-size: 18px; margin-bottom: 12px; }
+  .docker-overlay .modal p { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
+  .docker-overlay .modal .actions { display: flex; gap: 8px; justify-content: center; }
+  .docker-overlay .modal .btn { font-size: 13px; padding: 8px 20px; }
 </style>
 </head>
 <body>
+<div id="docker-overlay" class="docker-overlay hidden">
+  <div class="modal" id="docker-modal">
+    <div id="docker-prompt">
+      <h2>Docker is not running</h2>
+      <p>The Alfresco Control Plane needs Docker to be running.<br>Please launch Docker Desktop and try again.</p>
+      <div class="actions">
+        <button class="btn btn-primary" id="launch-btn" onclick="launchDocker()">Launch Docker</button>
+        <button class="btn btn-outline" onclick="retryDockerCheck()">Check Again</button>
+      </div>
+    </div>
+    <div id="docker-waiting" style="display:none">
+      <h2>Waiting for Docker...</h2>
+      <p>Docker Desktop has been launched.<br>Waiting for it to become ready.</p>
+      <div class="loading" style="font-size:24px;padding:12px 0">⋯</div>
+    </div>
+  </div>
+</div>
+
 <div class="header">
-  <h1><span>alfresco</span> manager</h1>
+  <h1><span>alfresco</span> control plane</h1>
   <div class="header-actions">
     <span id="services-summary" class="badge">loading</span>
     <button class="btn btn-primary btn-sm" onclick="startAll()">Start All</button>
+    <button class="btn btn-primary btn-sm" onclick="stopAll()">Stop All</button>
     <button class="btn btn-primary btn-sm" onclick="restartAll()">Restart All</button>
     <button class="btn btn-outline btn-sm" onclick="refreshAll()">Refresh</button>
   </div>
@@ -144,6 +179,16 @@
   <div id="services-list"></div>
 </div>
 
+<div class="card full" style="margin-bottom:16px">
+  <h2>Available Files <small>installs/ directory</small></h2>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('files','alfresco',this)">Content</div>
+    <div class="tab" onclick="switchTab('files','share',this)">Share</div>
+  </div>
+  <div id="files-alfresco" class="tab-content active"></div>
+  <div id="files-share" class="tab-content"></div>
+</div>
+
 <div class="grid">
   <div class="card">
     <h2>AMPs <small>installed modules</small></h2>
@@ -152,7 +197,7 @@
       <div class="tab" onclick="switchTab('amps','share',this)">Share</div>
     </div>
     <div id="amps-alfresco" class="tab-content active"></div>
-    <div id="amps-share" class="tab-content"></div>
+    <div id="amps-share" class="tab-content active"></div>
   </div>
 
   <div class="card">
@@ -162,18 +207,8 @@
       <div class="tab" onclick="switchTab('jars','share',this)">Share</div>
     </div>
     <div id="jars-alfresco" class="tab-content active"></div>
-    <div id="jars-share" class="tab-content"></div>
+    <div id="jars-share" class="tab-content active"></div>
   </div>
-</div>
-
-<div class="card full">
-  <h2>Available Files <small>installs/ directory</small></h2>
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('files','alfresco',this)">Content</div>
-    <div class="tab" onclick="switchTab('files','share',this)">Share</div>
-  </div>
-  <div id="files-alfresco" class="tab-content active"></div>
-  <div id="files-share" class="tab-content"></div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -315,14 +350,18 @@ function renderFiles(svc, files) {
     el.innerHTML = '<div class="empty">no installable files in installs/ directory</div>';
     return;
   }
+  const installedJars = (state.jars && state.jars[svc]) || [];
+  const pendingAmps = (state.amps && state.amps[svc] && state.amps[svc].pending) || [];
   let html = '<div class="file-list">';
   for (const f of files) {
     const isAmp = f.endsWith('.amp');
+    const alreadyInstalled = isAmp ? pendingAmps.includes(f) : installedJars.includes(f);
     const action = isAmp ? `installAmp('${svc}','${escAttr(f)}')` : `installJar('${svc}','${escAttr(f)}')`;
     const label = isAmp ? 'Install AMP' : 'Install JAR';
+    const disabled = alreadyInstalled ? ' disabled' : '';
     html += `<span class="file-item">
       <span>${esc(f)}</span>
-      <button class="btn btn-primary btn-sm" onclick="${action}">${label}</button>
+      <button class="btn btn-primary btn-sm" onclick="${action}"${disabled}>${label}${alreadyInstalled ? ' (done)' : ''}</button>
     </span>`;
   }
   html += '</div>';
@@ -339,7 +378,8 @@ async function installAmp(svc, filename) {
   btn.disabled = false; btn.textContent = 'Install AMP';
   if (res.success) {
     showToast(`${filename}: ${res.message}`, 'success');
-    refreshAmps();
+    await refreshAmps();
+    await refreshFiles();
   } else {
     showToast(res.error || 'install failed', 'error');
   }
@@ -355,7 +395,8 @@ async function installJar(svc, filename) {
   btn.disabled = false; btn.textContent = 'Install JAR';
   if (res.success) {
     showToast(`${filename}: ${res.message}`, 'success');
-    refreshJars();
+    await refreshJars();
+    await refreshFiles();
   } else {
     showToast(res.error || 'install failed', 'error');
   }
@@ -368,7 +409,8 @@ async function removeJar(svc, filename) {
   });
   if (res.success) {
     showToast(`${filename}: ${res.message}`, 'success');
-    refreshJars();
+    await refreshJars();
+    await refreshFiles();
   } else {
     showToast(res.error || 'remove failed', 'error');
   }
@@ -388,6 +430,20 @@ async function startAll() {
   setTimeout(refreshAll, 5000);
 }
 
+async function stopAll() {
+  const btn = event.target; btn.disabled = true;
+  showToast('Stopping all containers...', 'info');
+  const res = await api('/api/stop', {
+    method: 'POST',
+    body: JSON.stringify({ containers: [] }),
+  });
+  btn.disabled = false;
+  const entries = Object.entries(res);
+  const ok = entries.filter(([,v]) => v === 'stopped').length;
+  showToast(`${ok}/${entries.length} containers stopped`, 'info');
+  setTimeout(refreshAll, 5000);
+}
+
 async function restartAll() {
   const btn = event.target; btn.disabled = true;
   showToast('Restarting containers...', 'info');
@@ -400,15 +456,65 @@ async function restartAll() {
   setTimeout(refreshAll, 3000);
 }
 
+async function checkDockerStatus() {
+  try {
+    const res = await api('/api/docker-status');
+    if (!res.running) {
+      document.getElementById('docker-overlay').classList.remove('hidden');
+      return false;
+    }
+    return true;
+  } catch {
+    document.getElementById('docker-overlay').classList.remove('hidden');
+    return false;
+  }
+}
+
+async function launchDocker() {
+  document.getElementById('docker-prompt').style.display = 'none';
+  document.getElementById('docker-waiting').style.display = '';
+  await api('/api/launch-docker', { method: 'POST' });
+  await pollDocker();
+}
+
+async function pollDocker() {
+  for (;;) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const res = await api('/api/docker-status');
+      if (res.running) {
+        document.getElementById('docker-overlay').classList.add('hidden');
+        refreshAll();
+        setInterval(refreshServices, 10000);
+        return;
+      }
+    } catch {}
+  }
+}
+
+async function retryDockerCheck() {
+  const ok = await checkDockerStatus();
+  if (ok) {
+    document.getElementById('docker-overlay').classList.add('hidden');
+    refreshAll();
+    setInterval(refreshServices, 10000);
+  }
+}
+
 async function refreshAll() {
-  await Promise.all([refreshServices(), refreshAmps(), refreshJars(), refreshFiles()]);
+  await Promise.all([refreshServices(), refreshAmps(), refreshJars()]);
+  await refreshFiles();
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 
-refreshAll();
-setInterval(refreshServices, 10000);
+checkDockerStatus().then(ok => {
+  if (ok) {
+    refreshAll();
+    setInterval(refreshServices, 10000);
+  }
+});
 </script>
 </body>
 </html>

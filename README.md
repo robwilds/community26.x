@@ -16,20 +16,32 @@ and a mechanism to execute httpclient style transactions from a javascript in a 
 
 Pretty straight forward...
 
-## Alfresco Manager
+## Alfresco Control Plane
 
-A web UI at `mgr/` for managing installed JARs and AMPs without using the CLI.
+A web UI at `mgr/` for managing Docker services, JARs, and AMPs without using the CLI.
+
+### Quick Start
+
+```
+./start_mgr.sh
+```
+
+This launches the server at http://localhost:9700 and automatically opens your browser. The script waits for the server to be ready before opening the page.
+
+If Docker is not running, the UI shows a prompt with a **Launch Docker** button. It then polls every 500ms and loads the dashboard once Docker is ready.
+
+### Manual Start
 
 ```
 python3 mgr/server.py
 ```
 
-Opens on http://localhost:9700 with:
+### Dashboard
 
-- **Status panel** — health check for both Alfresco and Share containers, with a Restart All button
+- **Services panel** — health check for all docker compose services, with Start, Stop, and Restart per-service and global Start All / Stop All / Restart All / Refresh buttons
+- **Available Files tab** — shows files in `installs/content/` and `installs/share/` with one-click Install AMP / Install JAR buttons. Already-installed files are shown with a disabled `(done)` button.
 - **AMPs tab** — lists installed modules (with title, version, ID) and pending AMPs in the container's amps directory
-- **JARs tab** — lists all JARs in WEB-INF/lib with per-file Remove button (deletes from container, requires restart to take effect)
-- **Available Files tab** — shows files in `installs/content/` and `installs/share/` with one-click Install AMP / Install JAR buttons. JARs are copied directly to WEB-INF/lib. AMPs are copied then installed via MMT (Module Management Tool).
+- **JARs tab** — lists all JARs in WEB-INF/lib with per-file Remove button
 - Auto-refreshes container status every 10 seconds. Uses zero dependencies (vanilla JS, Python stdlib only).
 
 ### note
