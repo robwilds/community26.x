@@ -49,6 +49,21 @@ def detect_containers():
             SHARE_CONTAINER = r2.stdout.strip().lstrip("/")
 
 
+def get_container_id(service):
+    r = run(["docker", "compose", "ps", "-q", service], cwd=str(PROJECT_ROOT))
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
+
+
+def fetch_logs(container_id, lines=20):
+    r = run(
+        ["docker", "logs", container_id, "--tail", str(lines), "--timestamps"],
+        timeout=10,
+    )
+    if r.returncode != 0:
+        return []
+    return (r.stdout + r.stderr).rstrip("\n").splitlines()
+
+
 def list_services():
     r = run(
         ["docker", "compose", "config", "--services"],
@@ -62,23 +77,36 @@ def list_services():
         cwd=str(PROJECT_ROOT),
     )
     running = set()
+    cids = {}
     if r2.returncode == 0 and r2.stdout.strip():
         import json as _json
         for line in r2.stdout.strip().splitlines():
             try:
                 info = _json.loads(line)
+                svc = info.get("Service")
                 if info.get("State") == "running":
-                    running.add(info.get("Service"))
+                    running.add(svc)
+                if svc:
+                    cids[svc] = info.get("ID") or info.get("Id") or ""
             except Exception:
                 pass
-    result = []
     profiles = _parse_compose_profiles()
-    for s in services:
-        result.append({
+    result = [
+        {
             "name": s,
             "running": s in running,
             "profile": s in profiles.get("donotstart", []),
-        })
+            "container_id": cids.get(s, ""),
+        }
+        for s in services
+    ]
+    priority = {"alfresco": 0, "share": 1}
+    result.sort(key=lambda x: (priority.get(x["name"], 2), x["name"]))
+    for svc in result:
+        if svc["container_id"]:
+            svc["dozzle_url"] = f"http://localhost:9999/container/{svc['container_id']}"
+        else:
+            svc["dozzle_url"] = None
     return result
 
 
@@ -423,10 +451,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/local-files":
             files = {"content": [], "share": []}
             for f in sorted((PROJECT_ROOT / "installs/content").iterdir()):
-                if f.suffix in (".jar", ".amp"):
+                if f.is_file():
                     files["content"].append(f.name)
             for f in sorted((PROJECT_ROOT / "installs/share").iterdir()):
-                if f.suffix in (".jar", ".amp"):
+                if f.is_file():
                     files["share"].append(f.name)
             return send_json(self, files)
 
@@ -436,6 +464,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/docker-status":
             return send_json(self, {"running": docker_is_running()})
 
+        if path.startswith("/api/logs/"):
+            service = path[len("/api/logs/"):]
+            cid = get_container_id(service)
+            if not cid:
+                return send_json(self, {"error": "container not found"}, 404)
+            lines = fetch_logs(cid)
+            return send_json(self, {"service": service, "logs": lines})
+
         send_json(self, {"error": "not found"}, 404)
 
     def do_POST(self):
@@ -444,6 +480,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length)) if length else {}
 
         detect_containers()
+
+        if parsed.path == "/api/upload":
+            target = body.get("target")
+            filename = body.get("filename")
+            data_b64 = body.get("data")
+            if not target or not filename or not data_b64:
+                return send_json(self, {"error": "target, filename, and data required"}, 400)
+            dest_dir = PROJECT_ROOT / "installs" / target
+            dest_path = dest_dir / os.path.basename(filename)
+            import base64
+            try:
+                dest_path.write_bytes(base64.b64decode(data_b64))
+                return send_json(self, {"success": True, "filename": os.path.basename(filename)})
+            except Exception as e:
+                return send_json(self, {"error": str(e)}, 500)
 
         if parsed.path == "/api/start":
             targets = body.get("containers", ["alfresco", "share"])
@@ -469,6 +520,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 run(shlex.split(dockercmd), timeout=10)
                 return send_json(self, {"success": True})
             return send_json(self, {"error": "no way to launch Docker found"}, 400)
+
+        if parsed.path == "/api/delete-file":
+            target = body.get("target")
+            filename = body.get("filename")
+            if not target or not filename:
+                return send_json(self, {"error": "target and filename required"}, 400)
+            file_path = PROJECT_ROOT / "installs" / target / os.path.basename(filename)
+            try:
+                file_path.resolve().relative_to((PROJECT_ROOT / "installs").resolve())
+            except ValueError:
+                return send_json(self, {"error": "invalid path"}, 400)
+            if not file_path.exists():
+                return send_json(self, {"error": "file not found"}, 404)
+            try:
+                file_path.unlink()
+                return send_json(self, {"success": True, "filename": filename})
+            except Exception as e:
+                return send_json(self, {"error": str(e)}, 500)
 
         if parsed.path == "/api/install/jar":
             container = body.get("container")
@@ -503,10 +572,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+import signal
+import sys
+
+# ... (lines 2-505) ...
+
+def shutdown(signum, frame):
+    print("\nShutting down server...")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, shutdown)
+signal.signal(signal.SIGTERM, shutdown)
+
 if __name__ == "__main__":
     detect_containers()
     server = http.server.HTTPServer((HOST, PORT), Handler)
-    print(f"Alfresco Manager UI: http://localhost:{PORT}")
-    print(f"  Alfresco: {ALFRESCO_CONTAINER}")
-    print(f"  Share:    {SHARE_CONTAINER}")
     server.serve_forever()
+

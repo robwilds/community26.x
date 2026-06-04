@@ -223,8 +223,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - 9999:8080
-    profiles:
-      - donotstart
+    #profiles:
+    #  - donotstart
   queryalfapi:
     image: wildsdocker/queryalfapi:v3
     ports:
@@ -335,8 +335,8 @@ services:
     ports:
       - 6443:443
       - 8400:80
-    profiles:
-      - donotstart
+    #profiles:
+    #  - donotstart
   email:
     #image: apache/james:memory-latest
     image: apache/james:demo-3.8.2
@@ -352,8 +352,8 @@ services:
       - type: bind
         source: ./data/services/email/derby/
         target: /var/store/
-    profiles:
-      - donotstart
+    #profiles:
+    #  - donotstart
   webmail:
     image: hardware/rainloop:latest
     volumes:
@@ -362,8 +362,8 @@ services:
       - 8800:8888
     depends_on:
       - email
-    profiles:
-      - donotstart
+    #profiles:
+    #  - donotstart
 volumes:
   alf_data:
   postgresdata:

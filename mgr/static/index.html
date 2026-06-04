@@ -43,10 +43,27 @@
   .status-dot.unhealthy { background: var(--red); }
   .status-dot.not-found { background: var(--muted); }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; overflow-y: auto; max-height: calc(100vh - 200px); }
   .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 8px; padding: 16px; position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    display: flex;
+    flex-direction: column; /* Arrange children vertically */
+    height: auto; /* Let content determine basic height */
+    min-height: 200px; /* Ensure some minimum visible area */
+
+  }
+  .card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0; /* Keep header size fixed */
   }
   .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
   .card h2 small { font-weight: 400; font-size: 11px; color: var(--muted); }
@@ -118,6 +135,25 @@
   }
 
   .flex { display: flex; gap: 16px; flex-wrap: wrap; }
+
+  .log-row td { padding: 0 8px 8px 8px; border-bottom: 1px solid var(--border); }
+  .log-row:hover td { background: transparent; }
+  .service-buttons { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+  .log-content {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 8px;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+    display: none;
+  }
+  .log-content.open { display: block; }
 
   .file-list { display: flex; flex-wrap: wrap; gap: 6px; }
   .file-item {
@@ -258,7 +294,9 @@ async function refreshServices() {
     const stopBtn = `<button class="btn btn-danger btn-sm" onclick="svcAction('stop','${name}')">Stop</button>`;
     const restartBtn = `<button class="btn btn-outline btn-sm" onclick="svcAction('restart','${name}')">Restart</button>`;
     const actions = s.running ? `${restartBtn} ${stopBtn}` : startBtn;
-    html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}</td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
+    const dozzleLink = s.container_id ? `<a href="${escAttr(s.dozzle_url)}" target="_blank" class="btn btn-outline btn-sm" title="View in Dozzle">Dozzle ↗</a>` : '';
+    html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}<span class="service-buttons"><span class="log-toggle btn btn-outline btn-sm" onclick="toggleLogs('${name}')">▶ Show Logs</span>${dozzleLink}</span></td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
+    html += `<tr class="log-row" id="log-row-${name}"><td colspan="3"><div class="log-content" id="logs-${name}"></div></td></tr>`;
   }
   html += '</tbody></table>';
   el.innerHTML = html;
@@ -275,6 +313,32 @@ async function svcAction(action, name) {
   const msg = res[name] || `${action}ed`;
   showToast(`${name}: ${msg}`, msg.startsWith('failed') ? 'error' : 'success');
   setTimeout(refreshServices, 3000);
+}
+
+async function toggleLogs(name) {
+  const content = document.getElementById(`logs-${name}`);
+  const toggle = event.target;
+  if (content.classList.contains('open')) {
+    content.classList.remove('open');
+    toggle.textContent = '▶ Show Logs';
+    return;
+  }
+  content.classList.add('open');
+  toggle.textContent = '▼ Hide Logs';
+  if (!content.dataset.loaded) {
+    content.textContent = 'loading...';
+    try {
+      const data = await api(`/api/logs/${name}`);
+      if (data.logs && data.logs.length > 0) {
+        content.textContent = data.logs.join('\n');
+      } else {
+        content.textContent = '(no log output)';
+      }
+      content.dataset.loaded = '1';
+    } catch {
+      content.textContent = '(failed to fetch logs)';
+    }
+  }
 }
 
 async function refreshAmps() {
@@ -346,36 +410,44 @@ async function refreshFiles() {
 
 function renderFiles(svc, files) {
   const el = document.getElementById(`files-${svc}`);
-  if (files.length === 0) {
-    el.innerHTML = '<div class="empty">no installable files in installs/ directory</div>';
-    return;
-  }
+  const key = svc === 'alfresco' ? 'content' : 'share';
   const installedJars = (state.jars && state.jars[svc]) || [];
   const pendingAmps = (state.amps && state.amps[svc] && state.amps[svc].pending) || [];
   let html = '<div class="file-list">';
-  for (const f of files) {
-    const isAmp = f.endsWith('.amp');
-    const alreadyInstalled = isAmp ? pendingAmps.includes(f) : installedJars.includes(f);
-    const action = isAmp ? `installAmp('${svc}','${escAttr(f)}')` : `installJar('${svc}','${escAttr(f)}')`;
-    const label = isAmp ? 'Install AMP' : 'Install JAR';
-    const disabled = alreadyInstalled ? ' disabled' : '';
-    html += `<span class="file-item">
-      <span>${esc(f)}</span>
-      <button class="btn btn-primary btn-sm" onclick="${action}"${disabled}>${label}${alreadyInstalled ? ' (done)' : ''}</button>
-    </span>`;
+  if (files.length === 0) {
+    html += '<div class="empty">no files in installs/ directory</div>';
+  } else {
+    for (const f of files) {
+      const isAmp = f.endsWith('.amp');
+      const isJar = f.endsWith('.jar');
+      const installable = isAmp || isJar;
+      const alreadyInstalled = isAmp ? pendingAmps.includes(f) : isJar && installedJars.includes(f);
+      html += `<span class="file-item">
+        <span>${esc(f)}</span>`;
+      if (installable) {
+        const action = isAmp ? `installAmp('${svc}','${escAttr(f)}')` : `installJar('${svc}','${escAttr(f)}')`;
+        const label = isAmp ? 'Install AMP' : 'Install JAR';
+        const disabled = alreadyInstalled ? ' disabled' : '';
+        html += `<button class="btn btn-primary btn-sm" onclick="${action}"${disabled}>${label}${alreadyInstalled ? ' (done)' : ''}</button>`;
+      }
+      html += `<button class="btn btn-danger btn-sm" onclick="deleteFile('${key}','${svc}','${escAttr(f)}')">Delete</button>`;
+      html += `</span>`;
+    }
   }
   html += '</div>';
+  html += `
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <input type="file" id="file-input-${key}" style="display:none" onchange="uploadFile('${key}','${svc}')">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-${key}').click()">Upload File</button>
+    </div>`;
   el.innerHTML = html;
 }
 
-async function installAmp(svc, filename) {
-  const btn = event.target;
-  btn.disabled = true; btn.textContent = '...';
+async function installAmpAction(svc, filename) {
   const res = await api('/api/install/amp', {
     method: 'POST',
     body: JSON.stringify({ container: svc, filename }),
   });
-  btn.disabled = false; btn.textContent = 'Install AMP';
   if (res.success) {
     showToast(`${filename}: ${res.message}`, 'success');
     await refreshAmps();
@@ -385,14 +457,11 @@ async function installAmp(svc, filename) {
   }
 }
 
-async function installJar(svc, filename) {
-  const btn = event.target;
-  btn.disabled = true; btn.textContent = '...';
+async function installJarAction(svc, filename) {
   const res = await api('/api/install/jar', {
     method: 'POST',
     body: JSON.stringify({ container: svc, filename }),
   });
-  btn.disabled = false; btn.textContent = 'Install JAR';
   if (res.success) {
     showToast(`${filename}: ${res.message}`, 'success');
     await refreshJars();
@@ -400,6 +469,20 @@ async function installJar(svc, filename) {
   } else {
     showToast(res.error || 'install failed', 'error');
   }
+}
+
+async function installAmp(svc, filename) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '...';
+  await installAmpAction(svc, filename);
+  btn.disabled = false; btn.textContent = 'Install AMP';
+}
+
+async function installJar(svc, filename) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '...';
+  await installJarAction(svc, filename);
+  btn.disabled = false; btn.textContent = 'Install JAR';
 }
 
 async function removeJar(svc, filename) {
@@ -413,6 +496,62 @@ async function removeJar(svc, filename) {
     await refreshFiles();
   } else {
     showToast(res.error || 'remove failed', 'error');
+  }
+}
+
+function uploadFile(key, svc) {
+  const input = document.getElementById(`file-input-${key}`);
+  const file = input.files[0];
+  if (!file) return;
+  const btn = input.parentElement.querySelector('.btn');
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const data = e.target.result.split(',')[1];
+    try {
+      const res = await api('/api/upload', {
+        method: 'POST',
+        body: JSON.stringify({ target: key, filename: file.name, data }),
+      });
+      if (res.success) {
+        showToast(`${file.name} uploaded`, 'success');
+        await refreshFiles();
+        const isAmp = file.name.endsWith('.amp');
+        const isJar = file.name.endsWith('.jar');
+        if ((isAmp || isJar) && confirm(`${file.name} uploaded successfully.\n\nDo you want to install it now?`)) {
+          if (isAmp) {
+            await installAmpAction(svc, file.name);
+          } else {
+            await installJarAction(svc, file.name);
+          }
+        }
+      } else {
+        showToast(res.error || 'upload failed', 'error');
+      }
+    } catch (err) {
+      showToast('upload failed', 'error');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function deleteFile(key, svc, filename) {
+  if (!confirm(`WARNING: Deleting files can be dangerous!\n\nAre you sure you want to delete "${filename}"?`)) {
+    return;
+  }
+  try {
+    const res = await api('/api/delete-file', {
+      method: 'POST',
+      body: JSON.stringify({ target: key, filename }),
+    });
+    if (res.success) {
+      showToast(`${filename} deleted`, 'success');
+      await refreshFiles();
+    } else {
+      showToast(res.error || 'delete failed', 'error');
+    }
+  } catch {
+    showToast('delete failed', 'error');
   }
 }
 
