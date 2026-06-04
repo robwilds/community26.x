@@ -73,6 +73,11 @@ Lists all `.jar` files in `WEB-INF/lib/` with a **Remove** button per file (dele
 
 Container status refreshes every 10 seconds. Use the **Refresh** button to force-update all panels immediately.
 
+## Demo Materials
+
+- **`DEMO_SCRIPT.md`** — step-by-step walkthrough script for recording a video demo (11 scenes, ~7 minutes)
+- **`Alfresco_Control_Plane_Features.pptx`** — PowerPoint presentation covering all features (dark theme, 10 slides)
+
 ## Technical Notes
 
 - **Backend**: Single-file Python `http.server` (stdlib only). All Docker interaction via `subprocess.run`.
