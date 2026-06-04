@@ -6,18 +6,6 @@ https://connect.hyland.com/t5/alfresco-blog/alfresco-community-edition-26-1-rele
 
 ## Getting Started
 
-```bash
-docker compose up -d
-```
-
-Login with **demo / demo**.
-
-After services start, run `./install_all.sh` to install OOTBEE Support Tools (https://github.com/OrderOfTheBee/ootbee-support-tools), a mechanism to execute HTTPClient-style transactions from JavaScript in a rule, and a custom Hyland theme JAR (select from Admin → Theme).
-
-## Alfresco Control Plane
-
-A web-based management UI at `mgr/` for managing Docker services, JARs, and AMPs without the CLI.
-
 ### Quick Start
 
 ```bash
@@ -37,11 +25,13 @@ python3 mgr/server.py
 Lists all services from `docker-compose.yaml` sorted with **alfresco** and **share** first, then alphabetically.
 
 Per-service controls:
+
 - **Start** / **Stop** / **Restart** buttons
 - **▶ Show Logs** accordion — expands to show the last 20 log lines (fetched via `docker logs --tail 20 --timestamps`), collapsed by default
 - **Dozzle ↗** link — opens that container's logs in Dozzle (http://localhost:9999)
 
 Global controls:
+
 - **Start All** / **Stop All** / **Restart All** buttons
 - **Refresh** button
 - Status badge showing `X/Y running` — green when all running, red otherwise
@@ -53,11 +43,13 @@ Services with `profiles: [donotstart]` are tagged with a badge and excluded from
 Two tabs: **Content** (`installs/content/`) and **Share** (`installs/share/`).
 
 Each file shows:
+
 - **Install AMP** / **Install JAR** button — copies the file into the container and (for AMPs) runs `alfresco-mmt install`
   - Already-installed files show a disabled **(done)** button
 - **Delete** button — removes the file from the directory, with a confirmation warning
 
 Upload:
+
 - **Upload File** button opens a file picker; any file type is accepted
 - After upload, a `confirm()` dialog asks if you want to install `.jar` / `.amp` files immediately
 
