@@ -72,6 +72,8 @@ Container status refreshes every 10 seconds. Use the **Refresh** button to force
 
 ## Technical Notes
 
+- **AI assistance**: This project was built with [opencode](https://opencode.ai) using the zen mode with the `big-pickle` model.
+
 - **Backend**: Single-file Python `http.server` (stdlib only). All Docker interaction via `subprocess.run`.
 - **Frontend**: Single HTML file with inline CSS/JS. Zero dependencies. Uses `async/await`, Fetch API, `innerHTML` rendering.
 - **Styling**: Dark theme via CSS variables, no frameworks.
