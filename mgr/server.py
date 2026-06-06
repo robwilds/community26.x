@@ -65,13 +65,19 @@ def fetch_logs(container_id, lines=20):
 
 
 def list_services():
+    # Get all service names from the compose YAML (includes profile-gated services)
+    all_services = _parse_all_service_names()
+    # Also get services visible to docker compose with current profiles
     r = run(
         ["docker", "compose", "config", "--services"],
         cwd=str(PROJECT_ROOT),
     )
-    if r.returncode != 0:
-        return []
-    services = r.stdout.strip().splitlines()
+    if r.returncode == 0 and r.stdout.strip():
+        config_services = r.stdout.strip().splitlines()
+        # Merge: prefer all_services from YAML, but add any extras from config
+        all_services = list(dict.fromkeys(all_services + config_services))
+
+    # Get running status and container IDs from docker compose ps
     r2 = run(
         ["docker", "compose", "ps", "--format", "json"],
         cwd=str(PROJECT_ROOT),
@@ -90,6 +96,7 @@ def list_services():
                     cids[svc] = info.get("ID") or info.get("Id") or ""
             except Exception:
                 pass
+
     profiles = _parse_compose_profiles()
     result = [
         {
@@ -98,7 +105,7 @@ def list_services():
             "profile": s in profiles.get("donotstart", []),
             "container_id": cids.get(s, ""),
         }
-        for s in services
+        for s in all_services
     ]
     priority = {"alfresco": 0, "share": 1}
     result.sort(key=lambda x: (priority.get(x["name"], 2), x["name"]))
@@ -133,6 +140,29 @@ def _parse_compose_profiles():
     except Exception:
         pass
     return profiles
+
+
+def _parse_all_service_names():
+    """Parse docker-compose.yaml to extract ALL service names, including those in profiles."""
+    names = []
+    try:
+        text = Path(PROJECT_ROOT / "docker-compose.yaml").read_text()
+        import re
+        in_services = False
+        for line in text.splitlines():
+            # Track top-level sections (no leading indent)
+            top = re.match(r"^(\S+):", line)
+            if top:
+                in_services = top.group(1) == "services"
+                continue
+            # Inside services section, collect names with 2-space indent
+            if in_services:
+                m = re.match(r"^  (\S+):", line)
+                if m and not line.startswith("   "):
+                    names.append(m.group(1))
+    except Exception:
+        pass
+    return names
 
 
 def read_file(path):
