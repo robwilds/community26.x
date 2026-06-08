@@ -16,9 +16,14 @@ ALFRESCO_CONTAINER = None
 SHARE_CONTAINER = None
 
 
-def docker_is_running():
+def check_docker_status():
     r = run(["docker", "info"], timeout=5)
-    return r.returncode == 0
+    if r.returncode == 0:
+        return {"running": True, "installed": True}
+    # Check if docker binary exists (command not found)
+    which = run(["sh", "-c", "command -v docker"], timeout=5)
+    installed = which.returncode == 0
+    return {"running": False, "installed": installed}
 
 
 def run(cmd, **kwargs):
@@ -492,7 +497,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return send_json(self, list_services())
 
         if path == "/api/docker-status":
-            return send_json(self, {"running": docker_is_running()})
+            return send_json(self, check_docker_status())
 
         if path.startswith("/api/logs/"):
             service = path[len("/api/logs/"):]

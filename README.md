@@ -12,7 +12,10 @@ https://connect.hyland.com/t5/alfresco-blog/alfresco-community-edition-26-1-rele
 ./start_mgr.sh
 ```
 
-Opens http://localhost:9700 with a Hyland-branded header. If Docker isn't running, an overlay appears with **Launch Docker** (opens Docker Desktop) and **Check Again** buttons, then polls until Docker is ready.
+Opens http://localhost:9700 with a Hyland-branded header. On page load, Docker presence is checked. If Docker is unavailable, an overlay prompts accordingly:
+
+- **Docker not installed** — shows a **Download Docker Desktop** link (opens docker.com) and a **Check Again** button.
+- **Docker not running** — shows **Launch Docker** (opens Docker Desktop) and **Check Again** buttons, then polls until Docker is ready.
 
 ### Manual Start
 
@@ -46,6 +49,7 @@ Each file shows:
 
 - **Install AMP** / **Install JAR** button — copies the file into the container and (for AMPs) runs `alfresco-mmt install`
   - Already-installed files show a disabled **(done)** button
+  - Buttons are disabled when Docker is not running; a message indicates they will be enabled once Docker starts
 - **Delete** button — removes the file from the directory, with a confirmation warning
 
 Upload:

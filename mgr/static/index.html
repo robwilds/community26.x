@@ -197,6 +197,14 @@
         <button class="btn btn-outline" onclick="retryDockerCheck()">Check Again</button>
       </div>
     </div>
+    <div id="docker-not-installed" style="display:none">
+      <h2>Docker is not installed</h2>
+      <p>The Alfresco Control Plane needs Docker to be installed.<br>Please download and install Docker Desktop, then try again.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="noopener">Download Docker Desktop</a>
+        <button class="btn btn-outline" onclick="retryDockerCheck()">Check Again</button>
+      </div>
+    </div>
     <div id="docker-waiting" style="display:none">
       <h2>Waiting for Docker...</h2>
       <p>Docker Desktop has been launched.<br>Waiting for it to become ready.</p>
@@ -213,9 +221,9 @@
   </div>
   <div class="header-actions">
     <span id="services-summary" class="badge">loading</span>
-    <button class="btn btn-primary btn-sm" onclick="startAll()">Start All</button>
-    <button class="btn btn-primary btn-sm" onclick="stopAll()">Stop All</button>
-    <button class="btn btn-primary btn-sm" onclick="restartAll()">Restart All</button>
+    <button class="btn btn-primary btn-sm" id="start-all-btn" onclick="startAll()">Start All</button>
+    <button class="btn btn-primary btn-sm" id="stop-all-btn" onclick="stopAll()">Stop All</button>
+    <button class="btn btn-primary btn-sm" id="restart-all-btn" onclick="restartAll()">Restart All</button>
     <button class="btn btn-outline btn-sm" onclick="refreshAll()">Refresh</button>
   </div>
 </div>
@@ -262,6 +270,9 @@
 <script>
 const API = '';
 let state = { amps: null, jars: null, files: null };
+let dockerReady = false;
+let openLogs = new Set();
+let logCache = {};
 
 function showToast(msg, type = 'info') {
   const t = document.getElementById('toast');
@@ -304,12 +315,26 @@ async function refreshServices() {
     const stopBtn = `<button class="btn btn-danger btn-sm" onclick="svcAction('stop','${name}')">Stop</button>`;
     const restartBtn = `<button class="btn btn-outline btn-sm" onclick="svcAction('restart','${name}')">Restart</button>`;
     const actions = s.running ? `${restartBtn} ${stopBtn}` : startBtn;
-    const dozzleLink = s.container_id ? `<a href="${escAttr(s.dozzle_url)}" target="_blank" class="btn btn-outline btn-sm" title="View in Dozzle">Dozzle ↗</a>` : '';
-    html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}<span class="service-buttons"><span class="log-toggle btn btn-outline btn-sm" onclick="toggleLogs('${name}')">▶ Show Logs</span>${dozzleLink}</span></td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
+    const logsBtn = s.running ? `<span class="log-toggle btn btn-outline btn-sm" onclick="toggleLogs('${name}')">▶ Show Logs</span>` : '';
+    const dozzleLink = s.running && s.container_id ? `<a href="${escAttr(s.dozzle_url)}" target="_blank" class="btn btn-outline btn-sm" title="View in Dozzle">Dozzle ↗</a>` : '';
+    html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}<span class="service-buttons">${logsBtn}${dozzleLink}</span></td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
     html += `<tr class="log-row" id="log-row-${name}"><td colspan="3"><div class="log-content" id="logs-${name}"></div></td></tr>`;
   }
   html += '</tbody></table>';
   el.innerHTML = html;
+  for (const name of openLogs) {
+    const content = document.getElementById(`logs-${name}`);
+    if (content) {
+      content.classList.add('open');
+      content.dataset.loaded = '1';
+      content.textContent = logCache[name] || '(no log output)';
+      const toggle = document.querySelector(`#log-row-${CSS.escape(name)} .log-toggle`);
+      if (toggle) toggle.textContent = '▼ Hide Logs';
+    }
+  }
+  document.getElementById('start-all-btn').disabled = running === total;
+  document.getElementById('stop-all-btn').disabled = running === 0;
+  document.getElementById('restart-all-btn').disabled = running === 0;
   return data;
 }
 
@@ -331,10 +356,12 @@ async function toggleLogs(name) {
   if (content.classList.contains('open')) {
     content.classList.remove('open');
     toggle.textContent = '▶ Show Logs';
+    openLogs.delete(name);
     return;
   }
   content.classList.add('open');
   toggle.textContent = '▼ Hide Logs';
+  openLogs.add(name);
   if (!content.dataset.loaded) {
     content.textContent = 'loading...';
     try {
@@ -344,9 +371,11 @@ async function toggleLogs(name) {
       } else {
         content.textContent = '(no log output)';
       }
+      logCache[name] = content.textContent;
       content.dataset.loaded = '1';
     } catch {
       content.textContent = '(failed to fetch logs)';
+      logCache[name] = content.textContent;
     }
   }
 }
@@ -437,14 +466,19 @@ function renderFiles(svc, files) {
       if (installable) {
         const action = isAmp ? `installAmp('${svc}','${escAttr(f)}')` : `installJar('${svc}','${escAttr(f)}')`;
         const label = isAmp ? 'Install AMP' : 'Install JAR';
-        const disabled = alreadyInstalled ? ' disabled' : '';
-        html += `<button class="btn btn-primary btn-sm" onclick="${action}"${disabled}>${label}${alreadyInstalled ? ' (done)' : ''}</button>`;
+        const dockerDisabled = dockerReady ? '' : ' disabled';
+        const disabled = alreadyInstalled || !dockerReady ? ' disabled' : '';
+        const tooltip = !dockerReady ? ' title="Will be enabled when Docker is running"' : '';
+        html += `<button class="btn btn-primary btn-sm" onclick="${action}"${disabled}${tooltip}>${label}${alreadyInstalled ? ' (done)' : ''}</button>`;
       }
       html += `<button class="btn btn-danger btn-sm" onclick="deleteFile('${key}','${svc}','${escAttr(f)}')">Delete</button>`;
       html += `</span>`;
     }
   }
   html += '</div>';
+  if (!dockerReady) {
+    html += `<div class="section-label" style="margin-top:12px;color:var(--orange)">Install buttons will be enabled once Docker is running.</div>`;
+  }
   html += `
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
       <input type="file" id="file-input-${key}" style="display:none" onchange="uploadFile('${key}','${svc}')">
@@ -608,13 +642,26 @@ async function restartAll() {
 async function checkDockerStatus() {
   try {
     const res = await api('/api/docker-status');
-    if (!res.running) {
-      document.getElementById('docker-overlay').classList.remove('hidden');
-      return false;
+    if (res.running) {
+      dockerReady = true;
+      return true;
     }
-    return true;
-  } catch {
+    if (res.installed === false) {
+      document.getElementById('docker-prompt').style.display = 'none';
+      document.getElementById('docker-not-installed').style.display = '';
+    } else {
+      document.getElementById('docker-not-installed').style.display = 'none';
+      document.getElementById('docker-prompt').style.display = '';
+    }
     document.getElementById('docker-overlay').classList.remove('hidden');
+    dockerReady = false;
+    return false;
+  } catch {
+    document.getElementById('docker-prompt').style.display = '';
+    document.getElementById('docker-not-installed').style.display = 'none';
+    document.getElementById('docker-waiting').style.display = 'none';
+    document.getElementById('docker-overlay').classList.remove('hidden');
+    dockerReady = false;
     return false;
   }
 }
@@ -633,6 +680,7 @@ async function pollDocker() {
       const res = await api('/api/docker-status');
       if (res.running) {
         document.getElementById('docker-overlay').classList.add('hidden');
+        dockerReady = true;
         refreshAll();
         setInterval(refreshServices, 10000);
         return;
