@@ -423,6 +423,64 @@
         font-size: 13px;
         padding: 8px 20px;
       }
+
+      .tour-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9998;
+        background: rgba(0, 0, 0, 0.55);
+      }
+      .tour-overlay.hidden {
+        display: none;
+      }
+      .tour-highlight {
+        position: fixed;
+        pointer-events: none;
+        border: 2px solid var(--accent);
+        border-radius: 6px;
+        box-shadow: 0 0 0 4px rgba(110, 51, 255, 0.25),
+          0 0 20px rgba(110, 51, 255, 0.15);
+        z-index: 9999;
+        transition: all 0.3s ease;
+      }
+      .tour-highlight.hidden {
+        display: none;
+      }
+      .tour-tooltip {
+        position: fixed;
+        z-index: 10000;
+        background: var(--card);
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        padding: 16px 20px;
+        max-width: 360px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      }
+      .tour-tooltip.hidden {
+        display: none;
+      }
+      .tour-tooltip h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text);
+      }
+      .tour-tooltip p {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin-bottom: 12px;
+      }
+      .tour-tooltip .tour-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .tour-tooltip .tour-counter {
+        font-size: 11px;
+        color: var(--muted);
+      }
     </style>
   </head>
   <body>
@@ -495,6 +553,25 @@
       </div>
     </div>
 
+    <div id="tour-overlay" class="tour-overlay hidden">
+      <div id="tour-highlight" class="tour-highlight hidden"></div>
+      <div id="tour-tooltip" class="tour-tooltip hidden">
+        <h3 id="tour-title"></h3>
+        <p id="tour-text"></p>
+        <div class="tour-footer">
+          <button class="btn btn-outline btn-sm" onclick="endTour()">
+            Skip tour
+          </button>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="tour-counter" id="tour-counter"></span>
+            <button class="btn btn-primary btn-sm" onclick="nextTourStep()">
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="header">
       <div style="display: flex; align-items: center; gap: 16px">
         <img src="/static/hyland-logo.svg" alt="Hyland" height="28" />
@@ -542,6 +619,13 @@
           onclick="restartAll()"
         >
           Restart All
+        </button>
+        <button
+          class="btn btn-outline btn-sm"
+          onclick="startTour(true)"
+          title="Show guided tour"
+        >
+          ?
         </button>
         <button class="btn btn-outline btn-sm" onclick="refreshAll()">
           Refresh
@@ -1117,6 +1201,146 @@
         document.getElementById("alfresco-overlay").classList.add("hidden");
       }
 
+      function findCardByTitle(prefix) {
+        const h2s = document.querySelectorAll(".card h2");
+        for (const h2 of h2s) {
+          if (h2.textContent.trim().startsWith(prefix)) {
+            return h2.closest(".card");
+          }
+        }
+        return null;
+      }
+
+      let tourStep = 0;
+
+      const tourSteps = [
+        {
+          target: () => document.querySelector(".header-actions"),
+          title: "Service Controls",
+          text: "Use Start All, Stop All, and Restart All to manage all services at once. Buttons enable and disable automatically based on service state.",
+          pos: "below",
+        },
+        {
+          target: () => document.querySelector("#services-list"),
+          title: "Services Table",
+          text: "Each Compose service is listed here. View its running status and use per-service Start, Stop, or Restart buttons.",
+          pos: "right",
+        },
+        {
+          target: () => document.querySelector(".service-buttons"),
+          title: "Logs &amp; Monitoring",
+          text: 'Click "Show Logs" to view container logs inline. Click Dozzle ↗ to open the real-time log viewer in a new tab.',
+          pos: "right",
+        },
+        {
+          target: () => findCardByTitle("Available Files"),
+          title: "File Management",
+          text: "Upload JAR and AMP files to the installs directory, then install them into running containers. Delete removes files from disk.",
+          pos: "right",
+        },
+        {
+          target: () => findCardByTitle("AMPs"),
+          title: "Installed Modules",
+          text: "View installed AMP modules with title, version, and ID. The Pending section shows AMPs in the amps directory ready to be installed.",
+          pos: "left",
+        },
+        {
+          target: () => findCardByTitle("JARs"),
+          title: "Library JARs",
+          text: "Browse JAR files in WEB-INF/lib. Click Remove to delete a JAR from the container. Changes take effect on restart.",
+          pos: "left",
+        },
+      ];
+
+      function showTourStep(index) {
+        const step = tourSteps[index];
+        if (!step) {
+          endTour();
+          return;
+        }
+        const el = step.target();
+        if (!el) {
+          nextTourStep();
+          return;
+        }
+        const rect = el.getBoundingClientRect();
+        const overlay = document.getElementById("tour-overlay");
+        const highlight = document.getElementById("tour-highlight");
+        const tooltip = document.getElementById("tour-tooltip");
+
+        overlay.classList.remove("hidden");
+        highlight.classList.remove("hidden");
+        tooltip.classList.remove("hidden");
+
+        highlight.style.left = rect.left - 4 + "px";
+        highlight.style.top = rect.top - 4 + "px";
+        highlight.style.width = rect.width + 8 + "px";
+        highlight.style.height = rect.height + 8 + "px";
+
+        document.getElementById("tour-title").textContent = step.title;
+        document.getElementById("tour-text").innerHTML = step.text;
+        document.getElementById("tour-counter").textContent =
+          index + 1 + " / " + tourSteps.length;
+
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+        requestAnimationFrame(() => {
+          positionTourTooltip(step.pos, rect);
+        });
+      }
+
+      function positionTourTooltip(pos, targetRect) {
+        const tooltip = document.getElementById("tour-tooltip");
+        const gap = 14;
+        let left, top;
+        const tw = tooltip.offsetWidth;
+        const th = tooltip.offsetHeight;
+
+        switch (pos) {
+          case "below":
+            left = targetRect.left + targetRect.width / 2 - tw / 2;
+            top = targetRect.bottom + gap;
+            break;
+          case "right":
+            left = targetRect.right + gap;
+            top =
+              targetRect.top + targetRect.height / 2 - th / 2;
+            break;
+          case "left":
+            left = targetRect.left - tw - gap;
+            top =
+              targetRect.top + targetRect.height / 2 - th / 2;
+            break;
+          default:
+            left = targetRect.right + gap;
+            top = targetRect.top;
+        }
+
+        left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+        top = Math.max(8, Math.min(top, window.innerHeight - th - 8));
+
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+      }
+
+      function nextTourStep() {
+        tourStep++;
+        if (tourStep >= tourSteps.length) {
+          endTour();
+        } else {
+          showTourStep(tourStep);
+        }
+      }
+
+      function endTour() {
+        document.getElementById("tour-overlay").classList.add("hidden");
+        document.getElementById("tour-highlight").classList.add("hidden");
+        document.getElementById("tour-tooltip").classList.add("hidden");
+        try {
+          localStorage.setItem("tour-done", "1");
+        } catch {}
+      }
+
       function esc(s) {
         return String(s)
           .replace(/&/g, "&amp;")
@@ -1127,9 +1351,21 @@
         return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
       }
 
+      function startTour(force) {
+        if (!force) {
+          try {
+            if (localStorage.getItem("tour-done") === "1") return;
+          } catch {}
+        }
+        setTimeout(() => {
+          tourStep = 0;
+          showTourStep(tourStep);
+        }, 2000);
+      }
+
       checkDockerStatus().then((ok) => {
         if (ok) {
-          refreshAll();
+          refreshAll().then(startTour);
           setInterval(refreshServices, 10000);
         }
       });
