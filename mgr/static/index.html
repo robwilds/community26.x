@@ -477,6 +477,24 @@
       </div>
     </div>
 
+    <div id="alfresco-overlay" class="docker-overlay hidden">
+      <div class="modal">
+        <h2>Alfresco is ready</h2>
+        <p>
+          Alfresco Content Services is up and running.<br />
+          Would you like to open it now?
+        </p>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="openAlfresco()">
+            Open Alfresco
+          </button>
+          <button class="btn btn-outline" onclick="dismissAlfrescoPrompt()">
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="header">
       <div style="display: flex; align-items: center; gap: 16px">
         <img src="/static/hyland-logo.svg" alt="Hyland" height="28" />
@@ -586,6 +604,8 @@
       let dockerReady = false;
       let openLogs = new Set();
       let logCache = {};
+      let alfrescoPromptShown = false;
+      let prevAlfrescoRunning = false;
 
       function showToast(msg, type = "info") {
         const t = document.getElementById("toast");
@@ -662,6 +682,16 @@
             if (toggle) toggle.textContent = "▼ Hide Logs";
           }
         }
+        const alfrescoSvc = data.find((s) => s.name === "alfresco");
+        if (
+          alfrescoSvc &&
+          alfrescoSvc.running &&
+          !prevAlfrescoRunning &&
+          !alfrescoPromptShown
+        ) {
+          setTimeout(checkAlfrescoHealth, 5000);
+        }
+        prevAlfrescoRunning = alfrescoSvc ? alfrescoSvc.running : false;
         document.getElementById("start-all-btn").disabled = running === total;
         document.getElementById("stop-all-btn").disabled = running === 0;
         document.getElementById("restart-all-btn").disabled = running === 0;
@@ -1064,6 +1094,27 @@
       async function refreshAll() {
         await Promise.all([refreshServices(), refreshAmps(), refreshJars()]);
         await refreshFiles();
+      }
+
+      async function checkAlfrescoHealth() {
+        try {
+          const status = await api("/api/status");
+          if (status.alfresco && status.alfresco.health === "healthy") {
+            document
+              .getElementById("alfresco-overlay")
+              .classList.remove("hidden");
+            alfrescoPromptShown = true;
+          }
+        } catch {}
+      }
+
+      function openAlfresco() {
+        window.open("http://localhost:8080/alfresco", "_blank");
+        document.getElementById("alfresco-overlay").classList.add("hidden");
+      }
+
+      function dismissAlfrescoPrompt() {
+        document.getElementById("alfresco-overlay").classList.add("hidden");
       }
 
       function esc(s) {
