@@ -3,3 +3,4 @@
 **/ollama/models
 **/ollama/id_*
 #**/openwebui
+**/__pycache__

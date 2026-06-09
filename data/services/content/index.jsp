@@ -129,7 +129,6 @@ alfrescoContext.getRequestDispatcher("/AosResponder_ServerRoot"); if(rd != null)
           <% } %>
         </div>
       </div>
-      <iframe src="http://localhost:9999" width="100%" height="800px"></iframe>
 
       <div class="push"></div>
     </div>
