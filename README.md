@@ -69,6 +69,25 @@ Alfresco and Share tabs, each listing `.jar` files in `WEB-INF/lib/` with a **Re
 
 Container status refreshes every 10 seconds. Use the **Refresh** button to force-update all panels immediately.
 
+## Guided Tour
+
+On first visit, a **guided tour** appears 2 seconds after data loads, walking through 6 areas of the UI:
+
+1. **Service Controls** — Start All / Stop All / Restart All buttons
+2. **Services Table** — per-service status and Start/Stop/Restart
+3. **Logs &amp; Monitoring** — Show Logs accordion and Dozzle ↗ link
+4. **File Management** — Upload, Install, and Delete
+5. **Installed Modules** — AMPs panel with installed + pending lists
+6. **Library JARs** — WEB-INF/lib listing with Remove
+
+Each step dims the background, highlights the target element, and floats a tooltip with an **OK** button to advance. Click **Skip tour** at any point to dismiss. The tour runs only once per browser (tracked via `localStorage`).
+
+To restart the tour on demand, click the **`?`** button in the top-right header next to Refresh.
+
+## Alfresco Ready Prompt
+
+When the Alfresco service transitions from stopped to running and its health probe returns healthy, a popup overlay asks if you'd like to open Alfresco at http://localhost:8080/alfresco. Click **Open Alfresco** to launch it in a new tab, or **Not now** to dismiss. The **Open Alfresco ↗** link in the header also appears whenever any services are running.
+
 ## Demo Materials
 
 - **`DEMO_SCRIPT.md`** — step-by-step walkthrough script for recording a video demo (11 scenes, ~7 minutes)
