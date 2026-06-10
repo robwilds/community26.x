@@ -90,8 +90,8 @@ When the Alfresco service transitions from stopped to running and its health pro
 
 ## Demo Materials
 
-- **`DEMO_SCRIPT.md`** — step-by-step walkthrough script for recording a video demo (11 scenes, ~7 minutes)
-- **`Alfresco_Control_Plane_Features.pptx`** — PowerPoint presentation covering all features (dark theme, 10 slides)
+- **`DEMO_SCRIPT.md`** — step-by-step walkthrough script for recording a video demo (12 scenes, ~8 minutes) covering services, logs, Dozzle, guided tour, file upload/install/delete, AMPs, JARs, Alfresco ready prompt, and Docker startup flows
+- **`Alfresco_Control_Plane_Features.pptx`** — PowerPoint presentation covering all features (dark theme)
 
 ## Technical Notes
 
