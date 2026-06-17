@@ -733,6 +733,19 @@
       </div>
     </div>
 
+    <div id="pull-overlay" class="docker-overlay hidden">
+      <div class="modal" style="max-width:680px;text-align:left">
+        <h2 style="text-align:center">Pulling images</h2>
+        <p style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px">
+          Downloading container images. This may take a while.
+        </p>
+        <pre id="pull-output" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;font-size:11px;font-family:'SF Mono',monospace;max-height:280px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--muted);line-height:1.4;margin:0"></pre>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
+          <button class="btn btn-outline btn-sm" id="pull-skip-btn" onclick="dismissPull()">Skip (start anyway)</button>
+        </div>
+      </div>
+    </div>
+
     <div id="tour-overlay" class="tour-overlay hidden">
       <div id="tour-highlight" class="tour-highlight hidden"></div>
       <div id="tour-tooltip" class="tour-tooltip hidden">
@@ -1816,6 +1829,69 @@
         setTimeout(refreshServices, 3000);
       }
 
+      let pullInProgress = false;
+      let pullContainers = [];
+
+      function dismissPull() {
+        document.getElementById("pull-overlay").classList.add("hidden");
+        pullInProgress = false;
+        showToast("Skipped pull, starting services...", "info");
+      }
+
+      async function _waitForPull(overlay, output) {
+        for (;;) {
+          await new Promise(function (r) { setTimeout(r, 600); });
+          if (!pullInProgress) {
+            // Skip button was clicked — proceed to start
+            return;
+          }
+          try {
+            const status = await api("/api/pull-status");
+            output.textContent = status.output;
+            output.scrollTop = output.scrollHeight;
+            if (status.complete) {
+              overlay.classList.add("hidden");
+              pullInProgress = false;
+              if (status.error) {
+                showToast("Pull had errors, starting anyway: " + status.error, "error");
+              }
+              return;
+            }
+          } catch (e) {}
+        }
+      }
+
+      async function pullAndStart(containers) {
+        if (pullInProgress) return;
+        pullContainers = containers;
+        try {
+          await api("/api/pull", {
+            method: "POST",
+            body: JSON.stringify({ containers }),
+          });
+        } catch (e) {
+          showToast("Pull request failed: " + e.message, "error");
+          return;
+        }
+        const overlay = document.getElementById("pull-overlay");
+        const output = document.getElementById("pull-output");
+        output.textContent = "";
+        overlay.classList.remove("hidden");
+        pullInProgress = true;
+        await _waitForPull(overlay, output);
+        try {
+          const res = await api("/api/start", {
+            method: "POST",
+            body: JSON.stringify({ containers }),
+          });
+          const entries = Object.entries(res);
+          const ok = entries.filter(function (e) { return e[1] === "started"; }).length;
+          showToast(ok + "/" + entries.length + " containers started", ok === entries.length ? "success" : "error");
+        } catch (e) {
+          showToast("Start failed: " + e.message, "error");
+        }
+      }
+
       async function installAll(svc) {
         const key = svc === "alfresco" ? "content" : "share";
         const files = state.files[key] || [];
@@ -1886,23 +1962,12 @@
             // If check fails, proceed anyway
           }
         }
+        await pullAndStart([]);
         startFastRefreshUntil('start');
         waitingForAlfresco = true;
         alfrescoPromptShown = false;
         prevAlfrescoRunning = false;
         updateWaitBanner();
-        showToast("Starting all containers...", "info");
-        try {
-          const res = await api("/api/start", {
-            method: "POST",
-            body: JSON.stringify({ containers: [] }),
-          });
-          const entries = Object.entries(res);
-          const ok = entries.filter(([, v]) => v === "started").length;
-          showToast(`${ok}/${entries.length} containers started`, ok === entries.length ? "success" : "error");
-        } catch (e) {
-          showToast(`Start all failed: ${e.message}`, "error");
-        }
         btn.disabled = false;
       }
 

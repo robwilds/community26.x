@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import tempfile
+import threading
 import urllib.parse
 import zipfile
 from pathlib import Path
@@ -73,6 +74,50 @@ def run(cmd, **kwargs):
     return subprocess.run(
         cmd, capture_output=True, text=True, timeout=kwargs.pop("timeout", 30), **kwargs
     )
+
+
+# Pull progress tracking
+_pull_state = {
+    "running": False,
+    "output": [],
+    "complete": False,
+    "error": None,
+}
+_pull_lock = threading.Lock()
+
+
+def _pull_images(services):
+    """Run docker compose pull in a background thread, populating _pull_state."""
+    global _pull_state
+    with _pull_lock:
+        _pull_state["running"] = True
+        _pull_state["output"] = []
+        _pull_state["complete"] = False
+        _pull_state["error"] = None
+    try:
+        cmd = ["docker", "compose", "pull", "--policy", "missing"] + services
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(COMPOSE_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        for line in iter(proc.stdout.readline, ""):
+            with _pull_lock:
+                _pull_state["output"].append(line)
+        proc.wait()
+        with _pull_lock:
+            _pull_state["complete"] = True
+            _pull_state["running"] = False
+            if proc.returncode != 0:
+                _pull_state["error"] = f"pull failed with code {proc.returncode}"
+    except Exception as e:
+        with _pull_lock:
+            _pull_state["complete"] = True
+            _pull_state["running"] = False
+            _pull_state["error"] = str(e)
 
 
 def _get_amp_module_id(local_path):
@@ -851,6 +896,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 return send_json(self, {"error": str(e), "needs_login": False}, 500)
 
+        if path == "/api/pull-status":
+            with _pull_lock:
+                return send_json(
+                    self,
+                    {
+                        "running": _pull_state["running"],
+                        "complete": _pull_state["complete"],
+                        "output": "".join(_pull_state["output"]),
+                        "error": _pull_state["error"],
+                    },
+                )
+
         if path.startswith("/api/logs/"):
             service = path[len("/api/logs/"):]
             cid = get_container_id(service)
@@ -892,6 +949,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return send_json(self, {"success": True, "filename": os.path.basename(filename)})
             except Exception as e:
                 return send_json(self, {"error": str(e)}, 500)
+
+        if parsed.path == "/api/pull":
+            targets = body.get("containers", [])
+            if not targets:
+                targets = [s["name"] for s in list_services() if not s.get("profile_name")]
+            thread = threading.Thread(target=_pull_images, args=(targets,), daemon=True)
+            thread.start()
+            return send_json(self, {"started": True})
 
         if parsed.path == "/api/start":
             targets = body.get("containers", [])

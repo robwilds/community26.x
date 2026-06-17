@@ -69,7 +69,7 @@ services:
       file: commons/base.yaml
       service: alfresco
   transform-core-aio:
-    image: alfresco/alfresco-transform-core-aio:5.4.0
+    image: alfresco/alfresco-transform-core-aio:5.4.2
     #image: alfresco-tengine-pii
     mem_limit: 1536m
     environment:
@@ -134,7 +134,7 @@ services:
     volumes:
       - postgresdata:/var/lib/postgresql/data
   solr6:
-    image: docker.io/alfresco/alfresco-search-services:2.0.18
+    image: docker.io/alfresco/alfresco-search-services:2.0.20
     mem_limit: 2g
     environment:
       # Solr needs to know how to register itself with Alfresco
@@ -153,8 +153,11 @@ services:
     ports:
       - "8083:8983" # Browser port
   activemq:
-    image: alfresco/alfresco-activemq:6.2.1-jre17-rockylinux8
+    image: docker.io/alfresco/alfresco-activemq:6.2.6-jre17-rockylinux8
     mem_limit: 1g
+    environment:
+      - ACTIVEMQ_ADMIN_LOGIN=admin
+      - ACTIVEMQ_ADMIN_PASSWORD=admin
     ports:
       - "8161:8161" # Web Console
       - "5672:5672" # AMQP
@@ -177,7 +180,7 @@ services:
       retries: 5
       start_period: 5s
   content-app:
-    image: alfresco/alfresco-content-app:7.3.0
+    image: alfresco/alfresco-content-app:7.5.0
     mem_limit: 128m
     environment:
       APP_BASE_SHARE_URL: "http://localhost:8080/aca/#/preview/s"
@@ -193,7 +196,7 @@ services:
     profiles:
       - donotstart
   control-center:
-    image: quay.io/alfresco/alfresco-control-center:10.3.0
+    image: quay.io/alfresco/alfresco-control-center:10.5.0
     mem_limit: 128m
     environment:
       APP_CONFIG_PROVIDER: "ECM"
@@ -231,7 +234,9 @@ services:
     ports:
       - "3000:8080" # Host_port:Container_port
     volumes:
-      - ./data/services/openwebui:/app/backend/data # Persistent storage for Open WebUI data
+      #- ./data/services/openwebui:/app/backend/data # Persistent storage for Open WebUI data
+      - ./data/services/openwebui/webui.db:/app/backend/data/webui.db # Persistent storage for Open WebUI data
+      - openwebuidata:/app/backend/data # Persistent storage for Open WebUI data
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434 # Link to the Ollama service on the host
     #profiles:
@@ -271,7 +276,8 @@ services:
       - LDAP_PASSWORD_HASH={CLEARTEXT}
       - LDAP_CUSTOM_LDIF_DIR=/home
     volumes:
-      - ./data/services/bitnamildap:/bitnami/openldap
+      #- ./data/services/bitnamildap:/bitnami/openldap
+      - ldapdata:/bitnami/openldap
       - type: bind
         source: ./data/services/bitnamildap/init.ldif
         target: /home/init.ldif
@@ -297,15 +303,14 @@ services:
     volumes:
       #- ./data/services/email/domainlist.xml:/root/conf/domainlist.xml
       - ./data/services/email/initialdata.sh:/root/initialdata.sh
-      - type: bind
-        source: ./data/services/email/derby/
-        target: /var/store/
+      - emaildata:/var/store
     #profiles:
     #  - donotstart
   webmail:
     image: hardware/rainloop:latest
     volumes:
-      - ./data/services/webmail:/rainloop/data
+      - webmaildata:/rainloop/data
+      - ./data/services/email/example.com.ini:/rainloop/data/_data_/_default_/domains/example.com.ini
     ports:
       - 8800:8888
     depends_on:
@@ -315,3 +320,7 @@ services:
 volumes:
   alf_data:
   postgresdata:
+  emaildata:
+  webmaildata:
+  ldapdata:
+  openwebuidata:
