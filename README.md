@@ -9,7 +9,7 @@ https://connect.hyland.com/t5/alfresco-blog/alfresco-community-edition-26-1-rele
 ### Quick Start
 
 ```bash
-./start_mgr.sh
+./start.sh
 ```
 
 Opens http://localhost:9700 with a Hyland-branded header. On page load, Docker presence is checked. If Docker is unavailable, an overlay prompts accordingly:
@@ -59,11 +59,18 @@ Upload:
 
 ### AMPs Panel
 
-Alfresco and Share tabs, each showing installed modules in a table (Title, Version, ID). Below that, **Pending** shows AMP files in the container's `amps/` or `amps_share/` directory.
+Alfresco and Share tabs, plus an **All Services** tab aggregating both. Each tab shows:
+
+- **Installed** — modules in a table (Title, Version, ID) with a **Remove** button per module
+- **Available (in installs/)** — AMP files from the local `installs/` directory not yet installed, with **Install** buttons
+- **Pending** — AMP files in the container's `amps/` or `amps_share/` directory (filtered to exclude AMPs already installed via MMT)
 
 ### JARs Panel
 
-Alfresco and Share tabs, each listing `.jar` files in `WEB-INF/lib/` with a **Remove** button per file (deletes from the running container).
+Alfresco and Share tabs, plus an **All Services** tab with service badges. Each tab shows:
+
+- **Installed** — `.jar` files in `WEB-INF/lib/` with a **Remove** button per file (deletes from the running container)
+- **Available (in installs/)** — JAR files from the local `installs/` directory not yet deployed, with **Install** buttons
 
 ## Auto-Refresh
 

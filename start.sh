@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ ! -f docker-compose.yaml ]; then
-  echo "ERROR: Run this from the project root (where docker-compose.yaml lives)" >&2
+if [ ! -f mgr/server.py ]; then
+  echo "ERROR: Run this from the project root (where mgr/server.py lives)" >&2
   exit 1
 fi
 

@@ -126,32 +126,37 @@ Record your screen at 1920×1080. Start with the control plane already open at h
 
 ## Scene 7 — AMPs Panel (5:00 – 5:40)
 
-**Visual**: AMPs panel showing installed modules and pending.
+**Visual**: AMPs panel showing installed modules, available from installs/, and pending.
 
 **Narration**:
-> "The AMPs panel shows what modules are currently installed inside the container, and what's pending in the amps directory ready to be installed."
+> "The AMPs panel shows installed modules, available AMPs from the local installs directory, and what's pending in the container's amps dir ready to be installed."
 
 **Actions**:
-- Point to the **Installed** table — Title, Version, ID columns
-- "Here we can see the installed AMPs with their version numbers."
-- Point to the **Pending** section below — lists AMP files in the container's amps dir
-- Switch between **Alfresco** and **Share** tabs
-- "We can check both containers."
+- Point to the **Installed** table — Title, Version, ID columns, each with a **Remove** button
+- "Every installed AMP can be removed, even those baked into the image."
+- Point to the **Available (in installs/)** section below — lists AMPs in the local installs/ directory with **Install** buttons
+- "Available AMPs can be installed directly from the browser."
+- Point to the **Pending** section — lists AMP files in the container's amps dir (filtered to exclude already-installed AMPs)
+- Switch between **Alfresco**, **Share**, and **All Services** tabs
+- "The All Services tab aggregates both containers."
 
 ---
 
 ## Scene 8 — JARs Panel (5:40 – 6:10)
 
-**Visual**: JARs panel showing all JARs in WEB-INF/lib.
+**Visual**: JARs panel showing installed JARs, available from installs/, and all three tabs.
 
 **Narration**:
-> "The JARs panel gives us visibility into every JAR deployed in WEB-INF/lib. We can remove individual JARs right from here."
+> "The JARs panel gives us visibility into every JAR deployed in WEB-INF/lib and available in the local installs directory. We can install, remove, and track JARs across both containers."
 
 **Actions**:
-- Point to the file list with Remove buttons
+- Point to the **Installed** list with Remove buttons
+- Point to the **Available (in installs/)** section with Install buttons
+- Switch between **Alfresco**, **Share**, and **All Services** tabs
+- "The All Services tab shows both containers with service badges, just like AMPs does."
 - Click **Remove** on a non-critical JAR
 - Toast: "myfile.jar removed"
-- "The JAR is deleted from the running container."
+- "The JAR is deleted from the running container. Available JARs can be deployed with one click."
 
 ---
 

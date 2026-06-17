@@ -225,48 +225,7 @@ services:
       - 9999:8080
     #profiles:
     #  - donotstart
-  queryalfapi:
-    image: wildsdocker/queryalfapi:v3
-    ports:
-      - 9600:9600
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 8G
-        reservations:
-          memory: 0G
-    volumes:
-      # downloaded shards
-      - ./data/services/queryalfapi/LLMs/:/root/.cache/
-      # map to static folder namely where swagger json is located
-      - ./data/services/queryalfapi/static/:/python-docker/static
-    #depends_on:
-    #alfresco:
-    #condition: service_healthy
-    environment:
-      BASE_URL: "http://alfresco:8080"
-      API_URL: "/static/swagger.json"
-      user: "admin"
-      pass: "admin"
-      devpath: "../src/assets/"
-      prodpath: "./static/"
-      port: "9600"
-      elasticapikey: "local"
-      elastichost: "http://elasticsearch:9200"
-      elasticcloudid: "123445"
-      elasticuser: "enterprise_search"
-      elasticpassword: "hylandforce1"
-      baseFilePlanID: ""
-      baseFilePlanQuery: '{"query": {"query": "select * from rma:filePlan","language": "cmis"}}'
-      OPEN_API_KEY: ""
-      HUGGING_FACE_HUB_TOKEN: ""
-      microsoft_model: "microsoft/Florence-2-base"
-      llama_vision_model: "unsloth/Llama-3.2-11B-Vision-Instruct"
-      llama_chat_repo: "hugging-quants/Llama-3.2-3B-Instruct-Q4_K_M-GGUF"
-      llama_chat_filename: "llama-3.2-3b-instruct-q4_k_m.gguf"
-    profiles:
-      - donotstart
+
   open-webui:
     image: ghcr.io/open-webui/open-webui:main # Or :cuda for GPU support
     ports:
@@ -275,20 +234,9 @@ services:
       - ./data/services/openwebui:/app/backend/data # Persistent storage for Open WebUI data
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434 # Link to the Ollama service on the host
-    #depends_on:
-    #  - mcpo
     #profiles:
     #  - donotstart
-  mcpo:
-    image: ghcr.io/open-webui/mcpo:main
-    ports:
-      - 8001:8000
-    command: mcpo --server-type "streamable-http" -- http://wildsalfmcp:8000/mcp
-    depends_on:
-      wildsalfmcp:
-        condition: service_healthy # Ensures the mcp server starts before mcpo server otherwise it will crash
-    profiles:
-      - donotstart
+
   wildsalfmcp:
     image: wildsdocker/wildsalfmcp:v3
     ports:

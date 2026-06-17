@@ -63,6 +63,67 @@
         gap: 8px;
         align-items: center;
       }
+      .disclaimer-banner {
+        padding: 8px 16px;
+        margin-bottom: 16px;
+        background: rgba(255, 211, 51, 0.08);
+        border: 1px solid rgba(255, 211, 51, 0.2);
+        border-radius: 8px;
+        color: var(--hyland-gold);
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: center;
+      }
+      .wait-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        background: rgba(255, 193, 7, 0.12);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .wait-banner .alfresco-icon {
+        display: flex;
+        line-height: 0;
+      }
+      .wait-banner .alfresco-icon svg {
+        width: 24px;
+        height: 24px;
+      }
+      .wait-banner:not(.hidden) .alfresco-icon .petal-g { animation: petalGreen 2.5s ease-in-out infinite; }
+      .wait-banner:not(.hidden) .alfresco-icon .petal-b { animation: petalBlue 2.5s ease-in-out infinite; }
+      .wait-banner:not(.hidden) .alfresco-icon .petal-o { animation: petalOrange 2.5s ease-in-out infinite; }
+      .wait-banner:not(.hidden) .alfresco-icon .petal-y { animation: petalYellow 2.5s ease-in-out infinite; }
+      @keyframes petalGreen {
+        0%, 100% { fill: #8bdc01; }
+        25% { fill: #33aaff; }
+        50% { fill: #fba100; }
+        75% { fill: #fde012; }
+      }
+      @keyframes petalBlue {
+        0%, 100% { fill: #33aaff; }
+        25% { fill: #fba100; }
+        50% { fill: #fde012; }
+        75% { fill: #8bdc01; }
+      }
+      @keyframes petalOrange {
+        0%, 100% { fill: #fba100; }
+        25% { fill: #fde012; }
+        50% { fill: #8bdc01; }
+        75% { fill: #33aaff; }
+      }
+      @keyframes petalYellow {
+        0%, 100% { fill: #fde012; }
+        25% { fill: #8bdc01; }
+        50% { fill: #33aaff; }
+        75% { fill: #fba100; }
+      }
+
       .status-dot {
         display: inline-block;
         width: 8px;
@@ -253,9 +314,24 @@
       }
       .toast.error {
         border-color: var(--red);
+        cursor: pointer;
       }
       .toast.info {
         border-color: var(--accent);
+      }
+      .toast-dismiss {
+        margin-left: 12px;
+        padding: 2px 10px;
+        border: 1px solid var(--red);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--red);
+        font-size: 11px;
+        cursor: pointer;
+        font-family: var(--font);
+      }
+      .toast-dismiss:hover {
+        background: rgba(255, 71, 87, 0.15);
       }
 
       .tabs {
@@ -362,6 +438,23 @@
       .log-content.open {
         display: block;
       }
+      .prop-row td {
+        padding: 0 8px 8px 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .prop-row:hover td {
+        background: transparent;
+      }
+      .prop-content {
+        display: none;
+        padding: 4px 0;
+      }
+      .prop-content.open {
+        display: block;
+      }
+      .log-line-error {
+        color: var(--red);
+      }
 
       .file-list {
         display: flex;
@@ -382,6 +475,41 @@
       .file-item .btn {
         padding: 2px 6px;
         font-size: 10px;
+      }
+
+      .properties-textarea {
+        width: 100%;
+        min-height: 320px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 11px;
+        padding: 8px;
+        resize: vertical;
+        line-height: 1.5;
+        tab-size: 2;
+      }
+      .properties-textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .properties-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+      }
+      .properties-status {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .properties-status.saved {
+        color: var(--green);
+      }
+      .properties-status.error {
+        color: var(--red);
       }
 
       .docker-overlay {
@@ -458,6 +586,9 @@
       }
       .tour-tooltip.hidden {
         display: none;
+      }
+      .hidden {
+        display: none !important;
       }
       .tour-tooltip h3 {
         font-size: 14px;
@@ -553,6 +684,55 @@
       </div>
     </div>
 
+    <div id="start-overlay" class="docker-overlay hidden">
+      <div class="modal">
+        <h2>Start all services?</h2>
+        <p>
+          Docker is ready but no services are running.<br />
+          Would you like to start all containers now?
+        </p>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="acceptStartPrompt()">
+            Start All Services
+          </button>
+          <button class="btn btn-outline" onclick="dismissStartPrompt()">
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quay-overlay" class="docker-overlay hidden">
+      <div class="modal">
+        <h2>Quay.io Login Required</h2>
+        <p id="quay-missing-text">
+          Some container images need to be pulled from
+          <strong>quay.io</strong>. Please provide your credentials.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:10px;text-align:left;margin:16px 0">
+          <input type="text" id="quay-username" placeholder="Username" style="padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px">
+          <input type="password" id="quay-password" placeholder="Password or token" style="padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px">
+        </div>
+        <div id="quay-login-error" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px;padding:8px;background:rgba(255,71,87,0.1);border-radius:4px;text-align:left;white-space:pre-wrap;word-break:break-all"></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="quay-login-btn" onclick="submitQuayLogin()">Login</button>
+          <button class="btn btn-outline" onclick="dismissQuayLogin()">Skip</button>
+        </div>
+        <div id="quay-login-status" class="loading" style="display:none;margin-top:12px">Logging in to quay.io…</div>
+      </div>
+    </div>
+
+    <div id="restart-overlay" class="docker-overlay hidden">
+      <div class="modal">
+        <h2>Restart Required</h2>
+        <p id="restart-text">The <span id="restart-svc-name"></span> container needs to be restarted for the changes to take effect.</p>
+        <div class="actions">
+          <button class="btn btn-primary" id="restart-now-btn" onclick="restartContainer()">Restart Now</button>
+          <button class="btn btn-outline" onclick="dismissRestartPrompt()">Later</button>
+        </div>
+      </div>
+    </div>
+
     <div id="tour-overlay" class="tour-overlay hidden">
       <div id="tour-highlight" class="tour-highlight hidden"></div>
       <div id="tour-tooltip" class="tour-tooltip hidden">
@@ -574,7 +754,22 @@
 
     <div class="header">
       <div style="display: flex; align-items: center; gap: 16px">
-        <img src="/static/hyland-logo.svg" alt="Hyland" height="28" />
+        <span id="logo-svg" style="display:flex;line-height:0">
+          <svg width="135" height="28" viewBox="0 0 232 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clip-path="url(#logo-clip)">
+              <path d="M112.303 16.411V31.7728H108.729V25.4395H99.4351V31.7728H95.8604V16.411H99.4351V22.4024H108.727V16.411H112.303ZM130.796 16.411H134.993L127.349 25.397V31.7728H123.774V25.397L116.108 16.411H120.412L125.614 22.4874L130.794 16.411H130.796ZM138.796 16.411H142.371V28.7144H152.754V31.7728H138.796V16.411ZM168.293 16.411L175.937 31.7728H172.061L170.435 28.4787H162L160.374 31.7728H156.563L164.246 16.411H168.293ZM163.454 25.5246H168.998L166.236 19.9197L163.452 25.5246H163.454ZM195.947 31.7709H192.8L183.206 20.9668V31.7709H179.738V16.4091H183.357L192.479 26.6992V16.4091H195.947V31.7709ZM202 16.4033H210.014C215.509 16.4033 218.954 19.4173 218.954 24.1315C218.954 28.8458 215.507 31.8598 210.014 31.8598H202V16.4033ZM209.927 28.7665C213.26 28.7665 215.209 26.9369 215.209 24.1315C215.209 21.3262 213.264 19.4946 209.908 19.4946H205.482V28.7685H209.929L209.927 28.7665ZM224.968 17.122V19.9834H224.137V17.122H222.583V16.411H226.517V17.122H224.968ZM229.307 19.9834L228.096 17.2322V19.9834H227.284V16.411H228.539L229.653 18.9691L230.764 16.411H232V19.9834H231.194V17.2322L229.978 19.9834H229.307Z" fill="white"/>
+              <path class="d1" d="M43.3629 0L29.6323 23.9923H45.534L59.2645 0H43.3629Z" fill="#6E33FF"/>
+              <path class="d2" d="M13.7305 23.9961L0 47.9864H15.9017L29.6322 23.9961H13.7305Z" fill="#f1cb61"/>
+              <path class="d3" d="M45.5494 24.0078L31.8188 48.0001H47.7224L61.451 24.0078H45.5494Z" fill="#52A1FF"/>
+              <path class="d4" d="M75.1836 0.015625L61.4512 24.0079H77.3548L91.0872 0.015625H75.1836Z" fill="#13eac1"/>
+            </g>
+            <defs>
+              <clipPath id="logo-clip">
+                <rect width="232" height="48" fill="white"/>
+              </clipPath>
+            </defs>
+          </svg>
+        </span>
         <div style="width: 1px; height: 28px; background: var(--border)"></div>
         <h1
           style="
@@ -622,6 +817,13 @@
         </button>
         <button
           class="btn btn-outline btn-sm"
+          onclick="showQuayLogin()"
+          title="Login to quay.io for image pulls"
+        >
+          Quay
+        </button>
+        <button
+          class="btn btn-outline btn-sm"
           onclick="startTour(true)"
           title="Show guided tour"
         >
@@ -631,6 +833,107 @@
           Refresh
         </button>
       </div>
+    </div>
+
+    <div id="alfresco-wait-banner" class="wait-banner hidden">
+      <span class="alfresco-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 85 87">
+          <g transform="matrix(1.25,0,0,-1.25,-356.2181,895.7297)">
+            <g transform="matrix(1.8300314,0,0,1.8300314,-336.14156,-566.03538)">
+              <g>
+                <g transform="translate(358.3301,681.9383)">
+                  <path d="m 0,0 -5.339,5.339 -0.195,0.203 c -3.062,3.062 -8.035,3.07 -11.097,0.007 -3.063,-3.062 -3.063,-8.027 0,-11.09 3.062,-3.062 8.028,-3.062 11.091,0.001 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(358.331,681.9437)">
+                  <path d="m 0,0 0,-7.55 0.006,-0.282 c 0,-4.331 -3.511,-7.852 -7.842,-7.852 -4.331,0 -7.842,3.511 -7.842,7.842 0,4.331 3.512,7.842 7.843,7.842 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(358.331,681.9437)">
+                  <path d="m 0,0 0,-7.55 0.006,-0.282 c 0,-4.331 -3.511,-7.852 -7.842,-7.852 -4.331,0 -7.842,3.511 -7.842,7.842 0,4.331 3.512,7.842 7.843,7.842 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(358.331,681.9437)">
+                  <path d="m 0,0 0,-7.55 0.006,-0.282 c 0,-4.331 -3.511,-7.852 -7.842,-7.852 -4.331,0 -7.842,3.511 -7.842,7.842 0,0.476 0.042,0.942 0.123,1.394 3.058,-2.123 7.289,-1.823 10.014,0.902 l 5.54,5.541 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(350.495,680.948)">
+                  <path class="petal-g" d="m 0,0 c -3.781,0 -6.846,-3.065 -6.846,-6.846 0,-3.782 3.065,-6.847 6.846,-6.847 3.781,0 6.846,3.065 6.846,6.847 L 6.84,-6.555 6.84,0 0.016,0 0,0 z" fill="#8bdc01"/>
+                </g>
+                <g transform="translate(358.3313,681.9446)">
+                  <path d="m 0,0 5.339,-5.339 0.203,-0.195 c 3.063,-3.062 3.07,-8.035 0.007,-11.097 -3.062,-3.063 -8.027,-3.063 -11.09,0 -3.062,3.062 -3.062,8.028 0.001,11.091 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(353.4945,675.6996)">
+                  <path class="petal-g" d="m 0,0 c -2.674,-2.674 -2.674,-7.009 0,-9.682 2.674,-2.674 7.009,-2.674 9.682,0 2.674,2.673 2.674,7.008 0,9.682 L 9.472,0.202 4.837,4.837 0.012,0.011 0,0 z" fill="#8bdc01"/>
+                </g>
+                <g transform="translate(358.331,681.9454)">
+                  <path d="m 0,0 7.55,0 0.282,0.006 c 4.331,0 7.852,-3.511 7.852,-7.842 0,-4.331 -3.511,-7.842 -7.842,-7.842 C 3.511,-15.678 0,-12.166 0,-7.835 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(359.3267,674.1094)">
+                  <path class="petal-g" d="m 0,0 c 0,-3.781 3.065,-6.846 6.846,-6.846 3.782,0 6.847,3.065 6.847,6.846 0,3.781 -3.065,6.846 -6.847,6.846 L 6.554,6.84 0,6.84 0,0.016 0,0 z" fill="#8bdc01"/>
+                </g>
+                <g transform="translate(358.3302,681.9457)">
+                  <path d="m 0,0 5.339,5.339 0.195,0.203 c 3.062,3.062 8.035,3.07 11.097,0.007 3.063,-3.062 3.063,-8.027 0,-11.09 C 13.569,-8.603 8.603,-8.603 5.54,-5.54 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(364.5751,677.1089)">
+                  <path class="petal-g" d="m 0,0 c 2.674,-2.674 7.009,-2.674 9.682,0 2.674,2.674 2.674,7.009 0,9.682 -2.673,2.674 -7.008,2.674 -9.682,0 L -0.202,9.471 -4.837,4.837 -0.011,0.011 0,0 z" fill="#8bdc01"/>
+                </g>
+                <g transform="translate(358.3293,681.9454)">
+                  <path d="m 0,0 0,7.55 -0.006,0.282 c 0,4.331 3.511,7.852 7.842,7.852 4.331,0 7.842,-3.511 7.842,-7.842 C 15.678,3.511 12.166,0 7.835,0 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(366.1653,682.941)">
+                  <path class="petal-o" d="m 0,0 c 3.781,0 6.846,3.065 6.846,6.846 0,3.782 -3.065,6.847 -6.846,6.847 -3.781,0 -6.846,-3.065 -6.846,-6.847 L -6.84,6.555 -6.84,0 -0.016,0 0,0 z" fill="#fba100"/>
+                </g>
+                <g transform="translate(358.329,681.9445)">
+                  <path d="m 0,0 -5.339,5.339 -0.203,0.195 c -3.063,3.062 -3.07,8.035 -0.007,11.097 3.062,3.063 8.027,3.063 11.09,0 C 8.603,13.569 8.603,8.603 5.54,5.54 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(363.1658,688.1895)">
+                  <path class="petal-b" d="m 0,0 c 2.674,2.674 2.674,7.009 0,9.682 -2.674,2.674 -7.009,2.674 -9.682,0 -2.674,-2.673 -2.674,-7.008 0,-9.682 l 0.211,-0.202 4.634,-4.635 4.825,4.826 L 0,0 z" fill="#33aaff"/>
+                </g>
+                <g transform="translate(358.3293,681.9437)">
+                  <path d="m 0,0 -7.55,0 -0.282,-0.006 c -4.331,0 -7.852,3.511 -7.852,7.842 0,4.331 3.511,7.842 7.842,7.842 C -3.511,15.678 0,12.166 0,7.835 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(357.3336,689.7797)">
+                  <path class="petal-b" d="m 0,0 c 0,3.781 -3.065,6.846 -6.846,6.846 -3.782,0 -6.847,-3.065 -6.847,-6.846 0,-3.781 3.065,-6.846 6.847,-6.846 L -6.554,-6.84 0,-6.84 0,-0.016 0,0 z" fill="#33aaff"/>
+                </g>
+                <g transform="translate(358.3302,681.9434)">
+                  <path d="m 0,0 -18.928,-0.007 c -10e-4,2.008 0.765,4.016 2.297,5.548 3.062,3.062 8.028,3.062 11.091,-0.001 L 0,0 z" fill="#fff"/>
+                </g>
+                <g transform="translate(352.0852,686.7802)">
+                  <path class="petal-b" d="m 0,0 4.837,-4.837 -6.427,0 c -3.481,0 -6.433,-2.268 -7.457,-5.407 -0.22,0.172 -0.433,0.359 -0.635,0.562 -2.674,2.673 -2.674,7.008 0,9.682 2.673,2.674 7.008,2.674 9.682,0" fill="#33aaff"/>
+                </g>
+                <g transform="translate(352.1013,686.7802)">
+                  <path class="petal-b" d="m 0,0 3.829,-3.829 -5.147,0 -0.291,-0.006 c -3.135,0 -5.777,2.106 -6.59,4.981 2.608,1.462 5.969,1.084 8.188,-1.134 L 0,0 z" fill="#017dff"/>
+                </g>
+                <g transform="translate(357.3309,689.7811)">
+                  <path class="petal-b" d="m 0,0 0,-5.415 -3.639,3.639 -0.211,0.202 C -6.066,0.642 -6.445,4 -4.987,6.607 -2.109,5.797 0,3.153 0,0.016 L 0,0 z" fill="#017dff"/>
+                </g>
+                <g transform="translate(363.1867,688.1945)">
+                  <path class="petal-b" d="m 0,0 -3.829,-3.829 0,5.147 -0.006,0.291 c 0,3.135 2.106,5.777 4.98,6.59 C 2.608,5.591 2.23,2.23 0.012,0.011 L 0,0 z" fill="#017dff"/>
+                </g>
+                <g transform="translate(366.161,682.9554)">
+                  <path class="petal-y" d="m 0,0 -5.415,0 3.639,3.639 0.202,0.211 C 0.642,6.066 4,6.445 6.607,4.987 5.797,2.109 3.153,0 0.016,0 L 0,0 z" fill="#fde012"/>
+                </g>
+                <g transform="translate(364.5618,677.1361)">
+                  <path class="petal-g" d="m 0,0 -3.829,3.829 5.146,0 0.292,0.006 c 3.135,0 5.777,-2.106 6.59,-4.981 C 5.591,-2.608 2.23,-2.23 0.011,-0.012 L 0,0 z" fill="#47b41b"/>
+                </g>
+                <g transform="translate(359.3424,674.1411)">
+                  <path class="petal-g" d="M 0,0 0,5.415 3.639,1.776 3.85,1.574 C 6.066,-0.643 6.445,-4 4.987,-6.607 2.11,-5.797 0,-3.153 0,-0.016 L 0,0 z" fill="#47b41b"/>
+                </g>
+                <g transform="translate(353.5229,675.6953)">
+                  <path class="petal-g" d="m 0,0 3.829,3.829 0,-5.146 0.006,-0.292 c 0,-3.135 -2.106,-5.777 -4.981,-6.589 -1.462,2.607 -1.084,5.968 1.135,8.187 L 0,0 z" fill="#47b41b"/>
+                </g>
+                <g transform="translate(350.5186,680.9371)">
+                  <path class="petal-g" d="M 0,0 5.415,0 1.776,-3.639 1.574,-3.85 C -0.642,-6.066 -4,-6.446 -6.607,-4.987 -5.797,-2.11 -3.153,0 -0.016,0 L 0,0 z" fill="#47b41b"/>
+                </g>
+              </g>
+            </g>
+          </g>
+        </svg>
+      </span>
+      waiting for Alfresco…
+    </div>
+
+    <div class="disclaimer-banner">
+      This demo utilizes a sample custom UI to help showcase what is possible
+      with Docker and the Alfresco platform. This is not a productized UI/UX
+      that is delivered as part of Alfresco Enterprise.
     </div>
 
     <div class="card full" style="margin-bottom: 16px">
@@ -654,29 +957,37 @@
       <div class="card">
         <h2>AMPs <small>installed modules</small></h2>
         <div class="tabs">
-          <div class="tab active" onclick="switchTab('amps', 'alfresco', this)">
+          <div class="tab active" onclick="switchTab('amps', 'all', this)">
+            All Services
+          </div>
+          <div class="tab" onclick="switchTab('amps', 'alfresco', this)">
             Alfresco
           </div>
           <div class="tab" onclick="switchTab('amps', 'share', this)">
             Share
           </div>
         </div>
-        <div id="amps-alfresco" class="tab-content active"></div>
-        <div id="amps-share" class="tab-content active"></div>
+        <div id="amps-all" class="tab-content active"></div>
+        <div id="amps-alfresco" class="tab-content"></div>
+        <div id="amps-share" class="tab-content"></div>
       </div>
 
       <div class="card">
         <h2>JARs <small>WEB-INF/lib</small></h2>
         <div class="tabs">
-          <div class="tab active" onclick="switchTab('jars', 'alfresco', this)">
+          <div class="tab active" onclick="switchTab('jars', 'all', this)">
+            All Services
+          </div>
+          <div class="tab" onclick="switchTab('jars', 'alfresco', this)">
             Alfresco
           </div>
           <div class="tab" onclick="switchTab('jars', 'share', this)">
             Share
           </div>
         </div>
-        <div id="jars-alfresco" class="tab-content active"></div>
-        <div id="jars-share" class="tab-content active"></div>
+        <div id="jars-all" class="tab-content active"></div>
+        <div id="jars-alfresco" class="tab-content"></div>
+        <div id="jars-share" class="tab-content"></div>
       </div>
     </div>
 
@@ -685,17 +996,88 @@
     <script>
       const API = "";
       let state = { amps: null, jars: null, files: null };
+      let installing = {}; // "svc:filename" -> true
       let dockerReady = false;
+      let containersRunning = false;
       let openLogs = new Set();
       let logCache = {};
+      let propertiesOpen = false;
+      let propertiesDraft = null;
+
+      function escHtml(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+      }
+      function highlightLine(line) {
+        return /ERROR|FATAL|^\s*Exception|Caused by:|Traceback|^\s*at\s/.test(line)
+          ? '<span class="log-line-error">' + escHtml(line) + '</span>'
+          : escHtml(line);
+      }
+
       let alfrescoPromptShown = false;
       let prevAlfrescoRunning = false;
 
+      let pendingRestartContainer = null;
+      let refreshInterval;
+      let pendingAction = null;
+      let waitingForAlfresco = false;
+
+      function isAppropriate(svc) {
+        return !svc.profile_name || (svc.profile_name !== 'donotstart' && svc.profile_name !== 'disabled');
+      }
+
+      function startFastRefreshUntil(action) {
+        if (refreshInterval) clearInterval(refreshInterval);
+        pendingAction = action;
+        refreshInterval = setInterval(doRefresh, 1000);
+      }
+
+      function checkPendingAction(data) {
+        if (!pendingAction) return;
+        const appropriate = data.filter(isAppropriate);
+        let done = false;
+        if (pendingAction === 'start' || pendingAction === 'restart') {
+          done = appropriate.every(s => s.running);
+        } else if (pendingAction === 'stop') {
+          done = appropriate.every(s => !s.running);
+        }
+        if (done) {
+          pendingAction = null;
+          restoreNormalRefresh();
+        }
+      }
+
+      function updateWaitBanner() {
+        const banner = document.getElementById("alfresco-wait-banner");
+        const show = waitingForAlfresco && !alfrescoPromptShown;
+        if (banner) {
+          banner.classList.toggle("hidden", !show);
+        }
+      }
+
+      function restoreNormalRefresh() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(doRefresh, 5000);
+      }
+
       function showToast(msg, type = "info") {
         const t = document.getElementById("toast");
-        t.textContent = msg;
         t.className = "toast " + type + " show";
-        setTimeout(() => t.classList.remove("show"), 3000);
+        t.innerHTML = "";
+        t.appendChild(document.createTextNode(msg));
+        if (type === "error") {
+          const btn = document.createElement("button");
+          btn.className = "toast-dismiss";
+          btn.textContent = "OK";
+          btn.onclick = function (e) {
+            e.stopPropagation();
+            t.classList.remove("show");
+          };
+          t.appendChild(btn);
+        } else {
+          setTimeout(() => t.classList.remove("show"), 3000);
+        }
       }
 
       async function api(path, opts = {}) {
@@ -703,6 +1085,10 @@
           headers: { "Content-Type": "application/json" },
           ...opts,
         });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+        }
         return res.json();
       }
 
@@ -717,10 +1103,92 @@
         document.getElementById(`${group}-${target}`).classList.add("active");
       }
 
+      async function refreshProperties() {
+        if (!propertiesOpen) return;
+        const el = document.getElementById("props-alfresco");
+        if (!el) return;
+        const textarea = document.getElementById("properties-content");
+        if (textarea && document.activeElement === textarea) {
+          return;
+        }
+        try {
+          const data = await api("/api/properties");
+          if (data.error) {
+            el.innerHTML = '<div class="empty">' + esc(data.error) + '</div>';
+            return;
+          }
+          const currentContent = data.content || "";
+          el.innerHTML =
+            '<textarea class="properties-textarea" id="properties-content" spellcheck="false">' +
+            esc(currentContent) +
+            '</textarea>' +
+            '<div class="properties-actions">' +
+            '<button class="btn btn-primary btn-sm" onclick="saveProperties()">Save</button>' +
+            '<button class="btn btn-outline btn-sm" onclick="refreshProperties()">Discard &amp; Reload</button>' +
+            '<span class="properties-status" id="properties-status"></span>' +
+            '</div>';
+        } catch (e) {
+          el.innerHTML = '<div class="empty">Error loading properties: ' + esc(e.message) + '</div>';
+        }
+      }
+
+      async function toggleProperties() {
+        if (propertiesOpen) {
+          const el = document.getElementById("props-alfresco");
+          if (el) el.classList.remove("open");
+          propertiesOpen = false;
+          propertiesDraft = null;
+          const toggle = document.querySelector(".props-toggle");
+          if (toggle) toggle.textContent = "▶ Edit Global Properties";
+          return;
+        }
+        propertiesOpen = true;
+        const toggle = document.querySelector(".props-toggle");
+        if (toggle) toggle.textContent = "▼ Properties";
+        const el = document.getElementById("props-alfresco");
+        if (el) el.classList.add("open");
+        await refreshProperties();
+      }
+
+      async function saveProperties() {
+        const textarea = document.getElementById("properties-content");
+        if (!textarea) return;
+        const content = textarea.value;
+        const btn = document.querySelector("#props-alfresco .btn-primary");
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+        const statusEl = document.getElementById("properties-status");
+        statusEl.textContent = "";
+        statusEl.className = "properties-status";
+        try {
+          const res = await api("/api/properties", {
+            method: "POST",
+            body: JSON.stringify({ content }),
+          });
+          if (res.success) {
+            statusEl.textContent = "\u2713 Saved";
+            statusEl.className = "properties-status saved";
+            showToast("Properties saved \u2014 restart Alfresco for changes to take effect", "success");
+            showRestartPrompt("alfresco");
+          } else {
+            statusEl.textContent = "\u2717 " + (res.error || "save failed");
+            statusEl.className = "properties-status error";
+            showToast("Save failed: " + (res.error || "unknown error"), "error");
+          }
+        } catch (e) {
+          statusEl.textContent = "\u2717 " + e.message;
+          statusEl.className = "properties-status error";
+          showToast("Save failed: " + e.message, "error");
+        }
+        btn.disabled = false;
+        btn.textContent = "Save";
+      }
+
       async function refreshServices() {
         const data = await api("/api/services");
         const total = data.length;
         const running = data.filter((s) => s.running).length;
+        containersRunning = running > 0;
         const summary = document.getElementById("services-summary");
         summary.className = `badge ${running === total ? "healthy" : total > 0 ? "unhealthy" : "not-found"}`;
         summary.innerHTML = `<span class="status-dot ${running === total ? "healthy" : total > 0 ? "unhealthy" : "not-found"}"></span>${running}/${total} running`;
@@ -729,13 +1197,17 @@
         link.style.display = running > 0 ? "" : "none";
 
         const el = document.getElementById("services-list");
+        if (propertiesOpen) {
+          const ta = document.getElementById("properties-content");
+          if (ta) propertiesDraft = ta.value;
+        }
         let html =
           "<table><thead><tr><th>Service</th><th>Status</th><th></th></tr></thead><tbody>";
         for (const s of data) {
           const statusClass = s.running ? "healthy" : "not-found";
           const statusLabel = s.running ? "running" : "stopped";
-          const profileTag = s.profile
-            ? ' <span class="badge not-found" style="font-size:9px;vertical-align:middle">profile: donotstart</span>'
+          const profileTag = s.profile_name
+            ? ` <span class="badge not-found" style="font-size:9px;vertical-align:middle">profile: ${esc(s.profile_name)}</span>`
             : "";
           const name = escAttr(s.name);
           const startBtn = `<button class="btn btn-primary btn-sm" onclick="svcAction('start','${name}')">Start</button>`;
@@ -749,8 +1221,14 @@
             s.running && s.container_id
               ? `<a href="${escAttr(s.dozzle_url)}" target="_blank" class="btn btn-outline btn-sm" title="View in Dozzle">Dozzle ↗</a>`
               : "";
-          html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}<span class="service-buttons">${logsBtn}${dozzleLink}</span></td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
+          const propsBtn = s.name === "alfresco"
+            ? `<span class="props-toggle btn btn-outline btn-sm" onclick="toggleProperties()">${propertiesOpen ? '▼ Properties' : '▶ Edit Global Properties'}</span>`
+            : "";
+          html += `<tr><td class="name-cell">${esc(s.name)}${profileTag}<span class="service-buttons">${propsBtn}${logsBtn}${dozzleLink}</span></td><td><span class="status-dot ${statusClass}"></span> ${statusLabel}</td><td style="text-align:right;white-space:nowrap">${actions}</td></tr>`;
           html += `<tr class="log-row" id="log-row-${name}"><td colspan="3"><div class="log-content" id="logs-${name}"></div></td></tr>`;
+          if (s.name === "alfresco") {
+            html += `<tr class="prop-row" id="prop-row-alfresco"><td colspan="3"><div class="prop-content" id="props-alfresco"></div></td></tr>`;
+          }
         }
         html += "</tbody></table>";
         el.innerHTML = html;
@@ -758,12 +1236,31 @@
           const content = document.getElementById(`logs-${name}`);
           if (content) {
             content.classList.add("open");
-            content.dataset.loaded = "1";
-            content.textContent = logCache[name] || "(no log output)";
+            content.innerHTML = logCache[name]
+              ? logCache[name].split("\n").map(highlightLine).join("\n")
+              : "(no log output)";
             const toggle = document.querySelector(
               `#log-row-${CSS.escape(name)} .log-toggle`,
             );
             if (toggle) toggle.textContent = "▼ Hide Logs";
+            refreshLogContent(name);
+          }
+        }
+        if (propertiesOpen) {
+          const elProp = document.getElementById("props-alfresco");
+          if (elProp) {
+            elProp.classList.add("open");
+            const toggle = document.querySelector(".props-toggle");
+            if (toggle) toggle.textContent = "▼ Properties";
+            elProp.innerHTML =
+              '<textarea class="properties-textarea" id="properties-content" spellcheck="false">' +
+              esc(propertiesDraft || "") +
+              '</textarea>' +
+              '<div class="properties-actions">' +
+              '<button class="btn btn-primary btn-sm" onclick="saveProperties()">Save</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="refreshProperties()">Discard &amp; Reload</button>' +
+              '<span class="properties-status" id="properties-status"></span>' +
+              '</div>';
           }
         }
         const alfrescoSvc = data.find((s) => s.name === "alfresco");
@@ -779,6 +1276,8 @@
         document.getElementById("start-all-btn").disabled = running === total;
         document.getElementById("stop-all-btn").disabled = running === 0;
         document.getElementById("restart-all-btn").disabled = running === 0;
+        checkPendingAction(data);
+        updateWaitBanner();
         return data;
       }
 
@@ -797,6 +1296,22 @@
         setTimeout(refreshServices, 3000);
       }
 
+      function refreshLogContent(name) {
+        api(`/api/logs/${name}`).then(function (data) {
+          const content = document.getElementById(`logs-${name}`);
+          if (!content) return;
+          if (data.logs && data.logs.length > 0) {
+            content.innerHTML = data.logs.map(highlightLine).join("\n");
+          } else {
+            content.textContent = "(no log output)";
+          }
+          logCache[name] = data.logs ? data.logs.join("\n") : "";
+          content.scrollTop = content.scrollHeight;
+        }).catch(function () {
+          // keep stale logs on error
+        });
+      }
+
       async function toggleLogs(name) {
         const content = document.getElementById(`logs-${name}`);
         const toggle = event.target;
@@ -809,22 +1324,8 @@
         content.classList.add("open");
         toggle.textContent = "▼ Hide Logs";
         openLogs.add(name);
-        if (!content.dataset.loaded) {
-          content.textContent = "loading...";
-          try {
-            const data = await api(`/api/logs/${name}`);
-            if (data.logs && data.logs.length > 0) {
-              content.textContent = data.logs.join("\n");
-            } else {
-              content.textContent = "(no log output)";
-            }
-            logCache[name] = content.textContent;
-            content.dataset.loaded = "1";
-          } catch {
-            content.textContent = "(failed to fetch logs)";
-            logCache[name] = content.textContent;
-          }
-        }
+        content.textContent = "loading...";
+        refreshLogContent(name);
       }
 
       async function refreshAmps() {
@@ -833,20 +1334,26 @@
         for (const svc of ["alfresco", "share"]) {
           renderAmps(svc, data[svc]);
         }
+        renderAmpsSummary(data);
       }
 
       function renderAmps(svc, data) {
         const el = document.getElementById(`amps-${svc}`);
         const installed = data.installed || [];
         const pending = data.pending || [];
+        const available = data.available || [];
         let html = '<div class="section-label">Installed</div>';
         if (installed.length === 0) {
           html += '<div class="empty">none</div>';
         } else {
           html +=
-            "<table><thead><tr><th>Title</th><th>Version</th><th>ID</th></tr></thead><tbody>";
+            "<table><thead><tr><th>Title</th><th>Version</th><th>ID</th><th></th></tr></thead><tbody>";
           for (const a of installed) {
-            html += `<tr><td class="name-cell">${esc(a.title || a.id)}</td><td class="mono">${esc(a.version || "-")}</td><td class="muted mono">${esc(a.id)}</td></tr>`;
+            const mid = escAttr(a.id);
+            const uninstallBtn = a.removable
+              ? `<button class="btn btn-danger btn-sm" onclick="uninstallAmp('${mid}','${svc}')">Remove</button>`
+              : "";
+            html += `<tr><td class="name-cell">${esc(a.title || a.id)}</td><td class="mono">${esc(a.version || "-")}</td><td class="muted mono">${esc(a.id)}</td><td style="text-align:right;white-space:nowrap">${uninstallBtn}</td></tr>`;
           }
           html += "</tbody></table>";
         }
@@ -861,6 +1368,87 @@
           }
           html += "</div>";
         }
+        if (available.length > 0) {
+          html += '<div class="section-label" style="margin-top:16px">Available (in installs/ directory)</div>';
+          html += '<div class="file-list">';
+          for (const a of available) {
+            const instKey = svc + ":" + a;
+            const isInstalling = installing[instKey];
+            const disabled = !dockerReady || !containersRunning || isInstalling ? " disabled" : "";
+            const btnLabel = isInstalling ? "Installing..." : "Install AMP";
+            const onclick = isInstalling ? "" : ` onclick="installAmp('${svc}','${escAttr(a)}')"`;
+            html += `<span class="file-item"><span>${esc(a)}</span><button class="btn btn-primary btn-sm"${onclick}${disabled}>${btnLabel}</button></span>`;
+          }
+          html += "</div>";
+        }
+        el.innerHTML = html;
+      }
+
+      function renderAmpsSummary(data) {
+        const el = document.getElementById("amps-all");
+        let html = '<div class="section-label">Installed — both services</div>';
+        const allInstalled = [];
+        for (const svc of ["alfresco", "share"]) {
+          for (const a of data[svc].installed || []) {
+            allInstalled.push({ ...a, service: svc });
+          }
+        }
+        if (allInstalled.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html +=
+            "<table><thead><tr><th>Service</th><th>Title</th><th>Version</th><th>ID</th><th></th></tr></thead><tbody>";
+          for (const a of allInstalled) {
+            const label = a.service === "alfresco" ? "Alfresco" : "Share";
+            const mid = escAttr(a.id);
+            const uninstallBtn = a.removable
+              ? `<button class="btn btn-danger btn-sm" onclick="uninstallAmp('${mid}','${a.service}')">Remove</button>`
+              : "";
+            html += `<tr><td><span class="badge not-found">${label}</span></td><td class="name-cell">${esc(a.title || a.id)}</td><td class="mono">${esc(a.version || "-")}</td><td class="muted mono">${esc(a.id)}</td><td style="text-align:right;white-space:nowrap">${uninstallBtn}</td></tr>`;
+          }
+          html += "</tbody></table>";
+        }
+        html +=
+          '<div class="section-label" style="margin-top:16px">Pending (in amps dir) — both services</div>';
+        const allPending = [];
+        for (const svc of ["alfresco", "share"]) {
+          for (const p of data[svc].pending || []) {
+            allPending.push({ filename: p, service: svc });
+          }
+        }
+        if (allPending.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html += '<div class="file-list">';
+          for (const p of allPending) {
+            const label = p.service === "alfresco" ? "Alfresco" : "Share";
+            html += `<span class="file-item"><span class="badge not-found" style="margin-right:6px">${label}</span><span>${esc(p.filename)}</span></span>`;
+          }
+          html += "</div>";
+        }
+        html +=
+          '<div class="section-label" style="margin-top:16px">Available (in installs/ directory) — both services</div>';
+        const allAvailable = [];
+        for (const svc of ["alfresco", "share"]) {
+          for (const a of data[svc].available || []) {
+            allAvailable.push({ filename: a, service: svc });
+          }
+        }
+        if (allAvailable.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html += '<div class="file-list">';
+          for (const a of allAvailable) {
+            const label = a.service === "alfresco" ? "Alfresco" : "Share";
+            const instKey = a.service + ":" + a.filename;
+            const isInstalling = installing[instKey];
+            const disabled = !dockerReady || !containersRunning || isInstalling ? " disabled" : "";
+            const btnLabel = isInstalling ? "Installing..." : "Install AMP";
+            const onclick = isInstalling ? "" : ` onclick="installAmp('${a.service}','${escAttr(a.filename)}')"`;
+            html += `<span class="file-item"><span class="badge not-found" style="margin-right:6px">${label}</span><span>${esc(a.filename)}</span><button class="btn btn-primary btn-sm"${onclick}${disabled}>${btnLabel}</button></span>`;
+          }
+          html += "</div>";
+        }
         el.innerHTML = html;
       }
 
@@ -868,23 +1456,100 @@
         const data = await api("/api/jars");
         state.jars = data;
         for (const svc of ["alfresco", "share"]) {
-          renderJars(svc, data[svc] || []);
+          renderJars(svc, data[svc] || { installed: [], available: [] });
         }
+        renderJarsSummary(data);
       }
 
-      function renderJars(svc, jars) {
+      function renderJars(svc, data) {
         const el = document.getElementById(`jars-${svc}`);
-        if (jars.length === 0) {
-          el.innerHTML = '<div class="empty">none</div>';
-          return;
-        }
+        const installed = data.installed || [];
+        const available = data.available || [];
         let html =
-          "<table><thead><tr><th>Filename</th><th></th></tr></thead><tbody>";
-        for (const j of jars) {
-          html += `<tr><td class="mono name-cell">${esc(j)}</td>`;
-          html += `<td style="text-align:right"><button class="btn btn-danger btn-sm" onclick="removeJar('${svc}','${escAttr(j)}')">Remove</button></td></tr>`;
+          '<div class="section-label">Installed (WEB-INF/lib)</div>';
+        if (installed.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html += "<table><thead><tr><th>Filename</th><th></th></tr></thead><tbody>";
+          for (const j of installed) {
+            const name = typeof j === "string" ? j : j.name;
+            const removable = typeof j === "object" && j.removable;
+            html += `<tr><td class="mono name-cell">${esc(name)}</td>`;
+            html += `<td style="text-align:right">`;
+            if (removable) {
+              html += `<button class="btn btn-danger btn-sm" onclick="removeJar('${svc}','${escAttr(name)}')">Remove</button>`;
+            }
+            html += `</td></tr>`;
+          }
+          html += "</tbody></table>";
         }
-        html += "</tbody></table>";
+        if (available.length > 0) {
+          html += '<div class="section-label" style="margin-top:16px">Available (in installs/ directory)</div>';
+          html += '<div class="file-list">';
+          for (const a of available) {
+            const instKey = svc + ":" + a;
+            const isInstalling = installing[instKey];
+            const disabled = !dockerReady || !containersRunning || isInstalling ? " disabled" : "";
+            const btnLabel = isInstalling ? "Installing..." : "Install JAR";
+            const onclick = isInstalling ? "" : ` onclick="installJar('${svc}','${escAttr(a)}')"`;
+            html += `<span class="file-item"><span>${esc(a)}</span><button class="btn btn-primary btn-sm"${onclick}${disabled}>${btnLabel}</button></span>`;
+          }
+          html += "</div>";
+        }
+        if (installed.length === 0 && available.length === 0) {
+          html = '<div class="empty">none</div>';
+        }
+        el.innerHTML = html;
+      }
+
+      function renderJarsSummary(data) {
+        const el = document.getElementById("jars-all");
+        let html = '<div class="section-label">Installed — both services</div>';
+        const allInstalled = [];
+        for (const svc of ["alfresco", "share"]) {
+          for (const j of (data[svc] && data[svc].installed) || []) {
+            const name = typeof j === "string" ? j : j.name;
+            const removable = typeof j === "object" && j.removable;
+            allInstalled.push({ name, removable, service: svc });
+          }
+        }
+        if (allInstalled.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html += "<table><thead><tr><th>Service</th><th>Filename</th><th></th></tr></thead><tbody>";
+          for (const j of allInstalled) {
+            const label = j.service === "alfresco" ? "Alfresco" : "Share";
+            html += `<tr><td><span class="badge not-found">${label}</span></td><td class="mono name-cell">${esc(j.name)}</td>`;
+            html += `<td style="text-align:right">`;
+            if (j.removable) {
+              html += `<button class="btn btn-danger btn-sm" onclick="removeJar('${j.service}','${escAttr(j.name)}')">Remove</button>`;
+            }
+            html += `</td></tr>`;
+          }
+          html += "</tbody></table>";
+        }
+        html += '<div class="section-label" style="margin-top:16px">Available (in installs/ directory) — both services</div>';
+        const allAvailable = [];
+        for (const svc of ["alfresco", "share"]) {
+          for (const a of (data[svc] && data[svc].available) || []) {
+            allAvailable.push({ filename: a, service: svc });
+          }
+        }
+        if (allAvailable.length === 0) {
+          html += '<div class="empty">none</div>';
+        } else {
+          html += '<div class="file-list">';
+          for (const a of allAvailable) {
+            const label = a.service === "alfresco" ? "Alfresco" : "Share";
+            const instKey = a.service + ":" + a.filename;
+            const isInstalling = installing[instKey];
+            const disabled = !dockerReady || !containersRunning || isInstalling ? " disabled" : "";
+            const btnLabel = isInstalling ? "Installing..." : "Install JAR";
+            const onclick = isInstalling ? "" : ` onclick="installJar('${a.service}','${escAttr(a.filename)}')"`;
+            html += `<span class="file-item"><span class="badge not-found" style="margin-right:6px">${label}</span><span>${esc(a.filename)}</span><button class="btn btn-primary btn-sm"${onclick}${disabled}>${btnLabel}</button></span>`;
+          }
+          html += "</div>";
+        }
         el.innerHTML = html;
       }
 
@@ -900,47 +1565,67 @@
       function renderFiles(svc, files) {
         const el = document.getElementById(`files-${svc}`);
         const key = svc === "alfresco" ? "content" : "share";
-        const installedJars = (state.jars && state.jars[svc]) || [];
+        const installedJarsData = (state.jars && state.jars[svc] && state.jars[svc].installed) || [];
+        const installedJarNames = installedJarsData.map(
+          function (j) { return typeof j === "string" ? j : j.name; }
+        );
         const pendingAmps =
           (state.amps && state.amps[svc] && state.amps[svc].pending) || [];
         let html = '<div class="file-list">';
+        let hasInstallable = false;
+        let allInstallableInstalled = true;
         if (files.length === 0) {
           html += '<div class="empty">no files in installs/ directory</div>';
         } else {
-          for (const f of files) {
-            const isAmp = f.endsWith(".amp");
-            const isJar = f.endsWith(".jar");
+          for (const entry of files) {
+            const name = typeof entry === "string" ? entry : entry.name;
+            const serverInstalled =
+              typeof entry === "object" ? entry.installed : false;
+            const isAmp = name.endsWith(".amp");
+            const isJar = name.endsWith(".jar");
             const installable = isAmp || isJar;
-            const alreadyInstalled = isAmp
-              ? pendingAmps.includes(f)
-              : isJar && installedJars.includes(f);
+            const alreadyInstalled =
+              serverInstalled ||
+              (isJar && installedJarNames.includes(name));
+            hasInstallable = true;
+            if (!alreadyInstalled) {
+              allInstallableInstalled = false;
+            }
             html += `<span class="file-item">
-        <span>${esc(f)}</span>`;
+        <span>${esc(name)}</span>`;
             if (installable) {
               const action = isAmp
-                ? `installAmp('${svc}','${escAttr(f)}')`
-                : `installJar('${svc}','${escAttr(f)}')`;
+                ? `installAmp('${svc}','${escAttr(name)}')`
+                : `installJar('${svc}','${escAttr(name)}')`;
               const label = isAmp ? "Install AMP" : "Install JAR";
-              const dockerDisabled = dockerReady ? "" : " disabled";
+              const instKey = svc + ":" + name;
+              const isInstalling = installing[instKey];
               const disabled =
-                alreadyInstalled || !dockerReady ? " disabled" : "";
+                alreadyInstalled || !dockerReady || !containersRunning || isInstalling ? " disabled" : "";
               const tooltip = !dockerReady
                 ? ' title="Will be enabled when Docker is running"'
-                : "";
-              html += `<button class="btn btn-primary btn-sm" onclick="${action}"${disabled}${tooltip}>${label}${alreadyInstalled ? " (done)" : ""}</button>`;
+                : !containersRunning
+                  ? ' title="Will be enabled when services are running"'
+                  : "";
+              const btnLabel = isInstalling ? "Installing..." : label + (alreadyInstalled ? " (done)" : "");
+              const onclick = isInstalling ? "" : ` onclick="${action}"`;
+              html += `<button class="btn btn-primary btn-sm"${onclick}${disabled}${tooltip}>${btnLabel}</button>`;
             }
-            html += `<button class="btn btn-danger btn-sm" onclick="deleteFile('${key}','${svc}','${escAttr(f)}')">Delete</button>`;
+            html += `<button class="btn btn-danger btn-sm" onclick="deleteFile('${key}','${svc}','${escAttr(name)}')">Delete</button>`;
             html += `</span>`;
           }
         }
         html += "</div>";
         if (!dockerReady) {
           html += `<div class="section-label" style="margin-top:12px;color:var(--orange)">Install buttons will be enabled once Docker is running.</div>`;
+        } else if (!containersRunning) {
+          html += `<div class="section-label" style="margin-top:12px;color:var(--orange)">Start services to install AMPs and JARs.</div>`;
         }
         html += `
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
       <input type="file" id="file-input-${key}" style="display:none" onchange="uploadFile('${key}','${svc}')">
       <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-${key}').click()">Upload File</button>
+      <button class="btn btn-primary btn-sm" onclick="installAll('${svc}')"${!dockerReady || !containersRunning || allInstallableInstalled ? ' disabled' : ''}${allInstallableInstalled && !(!dockerReady || !containersRunning) ? ' title="All files already installed"' : ''}>Install All</button>
     </div>`;
         el.innerHTML = html;
       }
@@ -954,8 +1639,24 @@
           showToast(`${filename}: ${res.message}`, "success");
           await refreshAmps();
           await refreshFiles();
+          showRestartPrompt(svc);
         } else {
           showToast(res.error || "install failed", "error");
+        }
+      }
+
+      async function uninstallAmp(moduleId, svc) {
+        const res = await api("/api/uninstall/amp", {
+          method: "POST",
+          body: JSON.stringify({ container: svc, module_id: moduleId }),
+        });
+        if (res.success) {
+          showToast(`${moduleId}: ${res.message}`, "success");
+          await refreshAmps();
+          await refreshFiles();
+          showRestartPrompt(svc);
+        } else {
+          showToast(res.error || "uninstall failed", "error");
         }
       }
 
@@ -968,27 +1669,28 @@
           showToast(`${filename}: ${res.message}`, "success");
           await refreshJars();
           await refreshFiles();
+          showRestartPrompt(svc);
         } else {
           showToast(res.error || "install failed", "error");
         }
       }
 
       async function installAmp(svc, filename) {
-        const btn = event.target;
-        btn.disabled = true;
-        btn.textContent = "...";
+        const key = svc + ":" + filename;
+        installing[key] = true;
+        renderFiles(svc, state.files[svc === "alfresco" ? "content" : "share"] || []);
         await installAmpAction(svc, filename);
-        btn.disabled = false;
-        btn.textContent = "Install AMP";
+        delete installing[key];
+        renderFiles(svc, state.files[svc === "alfresco" ? "content" : "share"] || []);
       }
 
       async function installJar(svc, filename) {
-        const btn = event.target;
-        btn.disabled = true;
-        btn.textContent = "...";
+        const key = svc + ":" + filename;
+        installing[key] = true;
+        renderFiles(svc, state.files[svc === "alfresco" ? "content" : "share"] || []);
         await installJarAction(svc, filename);
-        btn.disabled = false;
-        btn.textContent = "Install JAR";
+        delete installing[key];
+        renderFiles(svc, state.files[svc === "alfresco" ? "content" : "share"] || []);
       }
 
       async function removeJar(svc, filename) {
@@ -1031,11 +1733,16 @@
                   `${file.name} uploaded successfully.\n\nDo you want to install it now?`,
                 )
               ) {
+                const instKey = svc + ":" + file.name;
+                installing[instKey] = true;
+                await refreshFiles();
                 if (isAmp) {
                   await installAmpAction(svc, file.name);
                 } else {
                   await installJarAction(svc, file.name);
                 }
+                delete installing[instKey];
+                await refreshFiles();
               }
             } else {
               showToast(res.error || "upload failed", "error");
@@ -1071,47 +1778,176 @@
         }
       }
 
-      async function startAll() {
+      function showRestartPrompt(svc) {
+        pendingRestartContainer = svc;
+        document.getElementById("restart-svc-name").textContent = svc;
+        document.getElementById("restart-overlay").classList.remove("hidden");
+      }
+
+      function dismissRestartPrompt() {
+        document.getElementById("restart-overlay").classList.add("hidden");
+        pendingRestartContainer = null;
+      }
+
+      async function restartContainer() {
+        const svc = pendingRestartContainer;
+        if (!svc) return;
+        if (svc === "alfresco") {
+          waitingForAlfresco = true;
+          prevAlfrescoRunning = false;
+          alfrescoPromptShown = false;
+        }
+        const btn = document.getElementById("restart-now-btn");
+        btn.disabled = true;
+        btn.textContent = "Restarting...";
+        try {
+          const res = await api("/api/restart", {
+            method: "POST",
+            body: JSON.stringify({ containers: [svc] }),
+          });
+          const msg = res[svc] || "restarted";
+          showToast(`${svc}: ${msg}`, msg.startsWith("failed") ? "error" : "success");
+        } catch (e) {
+          showToast(`Restart failed: ${e.message}`, "error");
+        }
+        btn.disabled = false;
+        btn.textContent = "Restart Now";
+        dismissRestartPrompt();
+        setTimeout(refreshServices, 3000);
+      }
+
+      async function installAll(svc) {
+        const key = svc === "alfresco" ? "content" : "share";
+        const files = state.files[key] || [];
+        const installedJarsData = (state.jars && state.jars[svc] && state.jars[svc].installed) || [];
+        const installedJarNames = installedJarsData.map(
+          function (j) { return typeof j === "string" ? j : j.name; }
+        );
+        const toInstall = files.filter(function (entry) {
+          const name = typeof entry === "string" ? entry : entry.name;
+          const installed =
+            typeof entry === "object" ? entry.installed : false;
+          const isAmp = name.endsWith(".amp");
+          const isJar = name.endsWith(".jar");
+          if (!isAmp && !isJar) return false;
+          if (installed) return false;
+          if (isJar && installedJarNames.includes(name)) return false;
+          return true;
+        });
+        if (toInstall.length === 0) {
+          showToast("All files already installed", "info");
+          return;
+        }
         const btn = event.target;
         btn.disabled = true;
-        showToast("Starting all containers...", "info");
-        const res = await api("/api/start", {
-          method: "POST",
-          body: JSON.stringify({ containers: [] }),
-        });
+        btn.textContent = "0/" + toInstall.length;
+        let ok = 0;
+        for (const f of toInstall) {
+          const name = typeof f === "string" ? f : f.name;
+          const isAmp = name.endsWith(".amp");
+          const instKey = svc + ":" + name;
+          installing[instKey] = true;
+          renderFiles(svc, files);
+          const endpoint = isAmp ? "/api/install/amp" : "/api/install/jar";
+          try {
+            const res = await api(endpoint, {
+              method: "POST",
+              body: JSON.stringify({ container: svc, filename: name }),
+            });
+            if (res.success) {
+              ok++;
+            }
+          } catch {}
+          delete installing[instKey];
+          renderFiles(svc, files);
+          btn.textContent = ok + "/" + toInstall.length;
+        }
         btn.disabled = false;
-        const entries = Object.entries(res);
-        const ok = entries.filter(([, v]) => v === "started").length;
-        showToast(`${ok}/${entries.length} containers started`, "info");
-        setTimeout(refreshAll, 5000);
+        btn.textContent = "Install All";
+        await refreshAmps();
+        await refreshJars();
+        await refreshFiles();
+        showToast(ok + "/" + toInstall.length + " installed", ok === toInstall.length ? "success" : "error");
+        showRestartPrompt(svc);
+      }
+
+      async function startAll(force) {
+        const btn = document.getElementById("start-all-btn");
+        btn.disabled = true;
+        if (!force) {
+          try {
+            const quay = await api("/api/docker/quay-status");
+            if (quay.needs_login) {
+              btn.disabled = false;
+              showQuayLogin();
+              return;
+            }
+          } catch (e) {
+            // If check fails, proceed anyway
+          }
+        }
+        startFastRefreshUntil('start');
+        waitingForAlfresco = true;
+        alfrescoPromptShown = false;
+        prevAlfrescoRunning = false;
+        updateWaitBanner();
+        showToast("Starting all containers...", "info");
+        try {
+          const res = await api("/api/start", {
+            method: "POST",
+            body: JSON.stringify({ containers: [] }),
+          });
+          const entries = Object.entries(res);
+          const ok = entries.filter(([, v]) => v === "started").length;
+          showToast(`${ok}/${entries.length} containers started`, ok === entries.length ? "success" : "error");
+        } catch (e) {
+          showToast(`Start all failed: ${e.message}`, "error");
+        }
+        btn.disabled = false;
       }
 
       async function stopAll() {
-        const btn = event.target;
+        const btn = document.getElementById("stop-all-btn");
         btn.disabled = true;
+        startFastRefreshUntil('stop');
+        waitingForAlfresco = false;
+        updateWaitBanner();
         showToast("Stopping all containers...", "info");
-        const res = await api("/api/stop", {
-          method: "POST",
-          body: JSON.stringify({ containers: [] }),
-        });
+        try {
+          const res = await api("/api/stop", {
+            method: "POST",
+            body: JSON.stringify({ containers: [] }),
+          });
+          const entries = Object.entries(res);
+          const ok = entries.filter(([, v]) => v === "stopped").length;
+          showToast(`${ok}/${entries.length} containers stopped`, ok === entries.length ? "success" : "error");
+        } catch (e) {
+          showToast(`Stop all failed: ${e.message}`, "error");
+        }
         btn.disabled = false;
-        const entries = Object.entries(res);
-        const ok = entries.filter(([, v]) => v === "stopped").length;
-        showToast(`${ok}/${entries.length} containers stopped`, "info");
-        setTimeout(refreshAll, 5000);
       }
 
       async function restartAll() {
-        const btn = event.target;
+        const btn = document.getElementById("restart-all-btn");
         btn.disabled = true;
-        showToast("Restarting containers...", "info");
-        const res = await api("/api/restart", {
-          method: "POST",
-          body: JSON.stringify({ containers: ["alfresco", "share"] }),
-        });
+        startFastRefreshUntil('restart');
+        waitingForAlfresco = true;
+        alfrescoPromptShown = false;
+        prevAlfrescoRunning = false;
+        updateWaitBanner();
+        showToast("Restarting all containers...", "info");
+        try {
+          const res = await api("/api/restart", {
+            method: "POST",
+            body: JSON.stringify({ containers: [] }),
+          });
+          const entries = Object.entries(res);
+          const ok = entries.filter(([, v]) => v === "restarted").length;
+          showToast(`${ok}/${entries.length} containers restarted`, ok === entries.length ? "success" : "error");
+        } catch (e) {
+          showToast(`Restart all failed: ${e.message}`, "error");
+        }
         btn.disabled = false;
-        showToast(`Alfresco: ${res.alfresco}, Share: ${res.share}`, "info");
-        setTimeout(refreshAll, 3000);
       }
 
       async function checkDockerStatus() {
@@ -1159,7 +1995,7 @@
               document.getElementById("docker-overlay").classList.add("hidden");
               dockerReady = true;
               refreshAll();
-              setInterval(refreshServices, 10000);
+              refreshInterval = setInterval(doRefresh, 5000);
               return;
             }
           } catch {}
@@ -1171,19 +2007,110 @@
         if (ok) {
           document.getElementById("docker-overlay").classList.add("hidden");
           refreshAll();
-          setInterval(refreshServices, 10000);
+          refreshInterval = setInterval(doRefresh, 5000);
         }
       }
 
-      async function refreshAll() {
+      async function showQuayLogin() {
+        clearQuayError();
+        try {
+          const status = await api("/api/docker/quay-status");
+          if (!status.needs_login) {
+            showToast("All quay.io images are cached locally", "success");
+            return;
+          }
+          const count = status.missing ? status.missing.length : 0;
+          document.getElementById("quay-missing-text").innerHTML =
+            count + " image(s) need to be pulled from <strong>quay.io</strong>.<br>Enter your credentials to log in.";
+          document.getElementById("quay-overlay").classList.remove("hidden");
+          document.getElementById("quay-username").value = "";
+          document.getElementById("quay-password").value = "";
+          document.getElementById("quay-username").focus();
+        } catch (e) {
+          showToast("Failed to check quay.io status: " + e.message, "error");
+        }
+      }
+
+      function dismissQuayLogin() {
+        document.getElementById("quay-overlay").classList.add("hidden");
+      }
+
+      function showQuayError(msg) {
+        const el = document.getElementById("quay-login-error");
+        el.textContent = msg;
+        el.style.display = "";
+      }
+
+      function clearQuayError() {
+        document.getElementById("quay-login-error").style.display = "none";
+      }
+
+      async function submitQuayLogin() {
+        clearQuayError();
+        const username = document.getElementById("quay-username").value.trim();
+        const password = document.getElementById("quay-password").value;
+        if (!username || !password) {
+          showQuayError("Username and password are required");
+          return;
+        }
+        const btn = document.getElementById("quay-login-btn");
+        btn.disabled = true;
+        document.getElementById("quay-login-status").style.display = "";
+        try {
+          const res = await api("/api/docker/login", {
+            method: "POST",
+            body: JSON.stringify({ username, password }),
+          });
+          if (res.success) {
+            showToast("Logged in to quay.io — starting containers...", "success");
+            dismissQuayLogin();
+            startAll(true);
+            return;
+          } else {
+            showQuayError(res.error || "login failed (unknown error)");
+          }
+        } catch (e) {
+          showQuayError("Request failed: " + e.message);
+        }
+        btn.disabled = false;
+        document.getElementById("quay-login-status").style.display = "none";
+      }
+
+      let startPromptDismissed = false;
+
+      function showStartPrompt() {
+        if (startPromptDismissed) return;
+        if (containersRunning) return;
+        if (dockerReady) {
+          document.getElementById("start-overlay").classList.remove("hidden");
+        }
+      }
+
+      function dismissStartPrompt() {
+        startPromptDismissed = true;
+        document.getElementById("start-overlay").classList.add("hidden");
+      }
+
+      function acceptStartPrompt() {
+        document.getElementById("start-overlay").classList.add("hidden");
+        startAll();
+      }
+
+      async function doRefresh() {
         await Promise.all([refreshServices(), refreshAmps(), refreshJars()]);
         await refreshFiles();
+        showStartPrompt();
+      }
+      async function refreshAll() {
+        await doRefresh();
+        showToast("Refreshed", "success");
       }
 
       async function checkAlfrescoHealth() {
         try {
           const status = await api("/api/status");
           if (status.alfresco && status.alfresco.health === "healthy") {
+            waitingForAlfresco = false;
             document
               .getElementById("alfresco-overlay")
               .classList.remove("hidden");
@@ -1193,7 +2120,7 @@
       }
 
       function openAlfresco() {
-        window.open("http://localhost:8080/alfresco", "_blank");
+        window.open("http://localhost:8080", "_blank");
         document.getElementById("alfresco-overlay").classList.add("hidden");
       }
 
@@ -1263,7 +2190,6 @@
           nextTourStep();
           return;
         }
-        const rect = el.getBoundingClientRect();
         const overlay = document.getElementById("tour-overlay");
         const highlight = document.getElementById("tour-highlight");
         const tooltip = document.getElementById("tour-tooltip");
@@ -1272,11 +2198,6 @@
         highlight.classList.remove("hidden");
         tooltip.classList.remove("hidden");
 
-        highlight.style.left = rect.left - 4 + "px";
-        highlight.style.top = rect.top - 4 + "px";
-        highlight.style.width = rect.width + 8 + "px";
-        highlight.style.height = rect.height + 8 + "px";
-
         document.getElementById("tour-title").textContent = step.title;
         document.getElementById("tour-text").innerHTML = step.text;
         document.getElementById("tour-counter").textContent =
@@ -1284,9 +2205,43 @@
 
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
-        requestAnimationFrame(() => {
+        const scrollEnd =
+          "onscrollend" in window
+            ? new Promise((r) => {
+                const handler = () => {
+                  el.removeEventListener("scrollend", handler);
+                  r();
+                };
+                el.addEventListener("scrollend", handler);
+              })
+            : null;
+
+        const doPosition = () => {
+          const rect = el.getBoundingClientRect();
+          highlight.style.left = rect.left - 4 + "px";
+          highlight.style.top = rect.top - 4 + "px";
+          highlight.style.width = rect.width + 8 + "px";
+          highlight.style.height = rect.height + 8 + "px";
           positionTourTooltip(step.pos, rect);
-        });
+        };
+
+        let positioned = false;
+        const guard = (fn) => () => {
+          if (positioned) return;
+          positioned = true;
+          fn();
+        };
+        if (scrollEnd) {
+          const timeout = setTimeout(guard(doPosition), 400);
+          scrollEnd.then(() => {
+            clearTimeout(timeout);
+            requestAnimationFrame(guard(doPosition));
+          });
+        } else {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(guard(doPosition));
+          });
+        }
       }
 
       function positionTourTooltip(pos, targetRect) {
@@ -1365,8 +2320,8 @@
 
       checkDockerStatus().then((ok) => {
         if (ok) {
-          refreshAll().then(startTour);
-          setInterval(refreshServices, 10000);
+          doRefresh().then(startTour);
+          refreshInterval = setInterval(doRefresh, 5000);
         }
       });
     </script>

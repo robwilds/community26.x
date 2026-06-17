@@ -1,0 +1,10 @@
+{
+  "alfresco": [
+    "alfresco-b64-jscript-root-1.0.0.jar",
+    "leonardo5-platform-1.0-SNAPSHOT.jar",
+    "acs-http-js-1.0.0.jar"
+  ],
+  "share": [
+    "hylandtheme-share-1.0-SNAPSHOT.jar"
+  ]
+}
