@@ -716,9 +716,28 @@ def do_start(containers):
         # Start All: only non-profile-gated services
         services = [s["name"] for s in list_services() if not s.get("profile_name")]
         r = run(["docker", "compose", "up", "-d", "--pull", "missing"], cwd=str(COMPOSE_DIR), timeout=360)
-    status = "started" if r.returncode == 0 else f"failed: {r.stderr or r.stdout or 'unknown error'}"
-    for c in services:
-        results[c] = status
+    if r.returncode == 0:
+        for c in services:
+            results[c] = "started"
+    else:
+        error_msg = r.stderr.strip() or r.stdout.strip() or "unknown error"
+        # Inspect post-start state to determine which services actually started
+        ps_r = run(["docker", "compose", "ps", "--format", "json"], cwd=str(COMPOSE_DIR))
+        running = set()
+        if ps_r.returncode == 0 and ps_r.stdout.strip():
+            import json as _json
+            for line in ps_r.stdout.strip().splitlines():
+                try:
+                    info = _json.loads(line)
+                    if info.get("State") == "running":
+                        running.add(info.get("Service"))
+                except Exception:
+                    pass
+        for c in services:
+            if c in running:
+                results[c] = "started"
+            else:
+                results[c] = f"failed: {error_msg}"
     return results
 
 

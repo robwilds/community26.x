@@ -1886,7 +1886,9 @@
           });
           const entries = Object.entries(res);
           const ok = entries.filter(function (e) { return e[1] === "started"; }).length;
-          showToast(ok + "/" + entries.length + " containers started", ok === entries.length ? "success" : "error");
+          const failed = entries.filter(function (e) { return e[1] !== "started"; });
+          const msg = ok + "/" + entries.length + " containers started" + (failed.length > 0 ? " — first error: " + failed[0][1].replace(/^failed:\s*/i, "") : "");
+          showToast(msg, ok === entries.length ? "success" : "error");
         } catch (e) {
           showToast("Start failed: " + e.message, "error");
         }

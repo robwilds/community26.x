@@ -49,11 +49,16 @@ Added `/api/services` endpoint that lists all services from `docker-compose.yaml
 ### 11. Stop + Restart per service
 Added `do_stop()` (`docker compose stop`) and switched `do_restart()` to `docker compose restart` so any service can be controlled. Added `/api/stop` endpoint. UI now shows Start (stopped) or Restart+Stop (running) per service row.
 
+### 12. Updated agent guide files (this session)
+Rewrote AGENTS.md, CLAUDE.md, and README.md with comprehensive documentation of all API endpoints, frontend features, overlays/quay-login/pull, properties editor, restart prompt, auto-refresh with fast-refresh, batch "Install All", AMP lifecycle, JAR tracking, background pull threading, YAML profile parsing, and container detection.
+
 ## Files Created/Modified
 - `install_all.sh` — rewritten (dynamic container/MMT detection, root user, restart, health wait)
 - `mgr/server.py` — management API server
 - `mgr/static/index.html` — management UI
-- `README.md` — added Alfresco Manager section
+- `README.md` — comprehensive rewrite covering all features
+- `AGENTS.md` — rewritten with full API/UI/implementation documentation
+- `CLAUDE.md` — rewritten with accurate structure, commands, all endpoints
 - `MEMORY.md` — this file
 
 ## Key Decisions

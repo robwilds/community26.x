@@ -32,6 +32,7 @@ Per-service controls:
 - **Start** / **Stop** / **Restart** buttons
 - **▶ Show Logs** accordion — expands to show the last 20 log lines (fetched via `docker logs --tail 20 --timestamps`), collapsed by default
 - **Dozzle ↗** link — opens that container's logs in Dozzle (http://localhost:9999)
+- **▶ Edit Global Properties** button (alfresco only) — inline textarea editor for `alfresco-global.properties` with Save/Discard & Reload buttons and a status indicator
 
 Global controls:
 
@@ -52,6 +53,8 @@ Each file shows:
   - Buttons are disabled when Docker is not running; a message indicates they will be enabled once Docker starts
 - **Delete** button — removes the file from the directory, with a confirmation warning
 
+- **Install All** button — batch-installs all uninstalled JARs and AMPs in sequence, with a progress counter (`X/Y`) shown on the button
+
 Upload:
 
 - **Upload File** button opens a file picker; any file type is accepted
@@ -69,12 +72,26 @@ Alfresco and Share tabs, plus an **All Services** tab aggregating both. Each tab
 
 Alfresco and Share tabs, plus an **All Services** tab with service badges. Each tab shows:
 
-- **Installed** — `.jar` files in `WEB-INF/lib/` with a **Remove** button per file (deletes from the running container)
+- **Installed** — `.jar` files in `WEB-INF/lib/` with a **Remove** button per file (deletes from the running container; only JARs installed through the UI are removable)
 - **Available (in installs/)** — JAR files from the local `installs/` directory not yet deployed, with **Install** buttons
+
+### Quay Login &amp; Pull Images
+
+When the **Start All** button is clicked, the UI first checks for missing quay.io images:
+
+- If images need to be pulled, a **Quay.io Login** overlay prompts for quay.io credentials (username + password/token). After successful login, a **Pull** overlay opens showing streaming `docker compose pull` output with a **Skip (start anyway)** button.
+- If all images are cached, the pull step is skipped and containers start immediately.
+- The **Quay** button in the header can manually trigger the login flow at any time.
+
+The pull runs in a background thread (`_pull_images()`) on the Python server, streaming line-by-line to the `GET /api/pull-status` endpoint, which the frontend polls every 600ms.
+
+### Restart Prompt
+
+After installing an AMP, JAR, saving properties, or uninstalling an AMP, a **Restart Required** overlay appears asking to restart the container. Click **Restart Now** to restart immediately, or **Later** to dismiss. When restarting Alfresco, an animated wait banner appears at the top of the page with a spinning Alfresco logo.
 
 ## Auto-Refresh
 
-Container status refreshes every 10 seconds. Use the **Refresh** button to force-update all panels immediately.
+All panels (services, AMPs, JARs, files) refresh every 5 seconds. During a pending start, stop, or restart action, the refresh interval accelerates to 1 second via `startFastRefreshUntil()`. The pending action completes when all appropriate services (excluding `donotstart` profile) reach the target state. Use the **Refresh** button to force-update all panels immediately.
 
 ## Guided Tour
 
@@ -95,6 +112,8 @@ To restart the tour on demand, click the **`?`** button in the top-right header 
 
 When the Alfresco service transitions from stopped to running and its health probe returns healthy, a popup overlay asks if you'd like to open Alfresco at http://localhost:8080/alfresco. Click **Open Alfresco** to launch it in a new tab, or **Not now** to dismiss. The **Open Alfresco ↗** link in the header also appears whenever any services are running.
 
+While waiting for Alfresco to become healthy (e.g., during start or restart), an animated Alfresco logo banner displays at the top of the page. The petals cycle through green, blue, orange, and yellow colors. The banner disappears once the health probe passes or the prompt is shown.
+
 ## Demo Materials
 
 - **`DEMO_SCRIPT.md`** — step-by-step walkthrough script for recording a video demo (12 scenes, ~8 minutes) covering services, logs, Dozzle, guided tour, file upload/install/delete, AMPs, JARs, Alfresco ready prompt, and Docker startup flows
@@ -105,11 +124,19 @@ When the Alfresco service transitions from stopped to running and its health pro
 - **AI assistance**: This project was built with [opencode](https://opencode.ai) using the zen mode with the `big-pickle` model.
 
 - **Backend**: Single-file Python `http.server` (stdlib only). All Docker interaction via `subprocess.run`.
-- **Frontend**: Single HTML file with inline CSS/JS. Zero dependencies. Uses `async/await`, Fetch API, `innerHTML` rendering.
-- **Styling**: Dark theme via CSS variables, no frameworks.
+- **Frontend**: Single HTML file with inline CSS/JS. Zero dependencies (2394 lines). Uses `async/await`, Fetch API, `innerHTML` rendering.
+- **Styling**: Dark theme via CSS variables (--bg, --card, --border, --text, --accent, etc.), Hyland brand colors (teal #13eac1, gold #f1cb61), Inter font.
 - **File uploads**: Base64-encoded in JSON body (not multipart, since `http.server` has no multipart parser).
 - **Service ordering**: `list_services()` sorts with alfresco (priority 0) and share (priority 1) first, then alphabetical.
+- **Profile detection**: `_parse_compose_profiles()` uses regex to parse `profiles: [donotstart]` from the YAML directly for badge display.
+- **Service name extraction**: `_parse_all_service_names()` reads `docker-compose.yaml` directly to capture all services (including profile-gated ones). Merged with `docker compose config --services` output.
+- **AMP lifecycle**: Files are renamed `.amp` → `.applied` after MMT install; uninstall reverses via MMT + renames back to `.amp`.
+- **JAR tracking**: Only JARs installed through the UI are removable. Persisted to `mgr/data/installed_jars.json`.
+- **Background pull**: `docker compose pull` runs in a background threading with line-by-line streaming. State tracked via `_pull_state` dict protected by `_pull_lock`.
 - **Delete path validation**: `/api/delete-file` resolves the path and verifies it's within `installs/` to prevent directory traversal.
+- **Auto-refresh**: 5s cycle; accelerates to 1s during pending start/stop/restart actions via `startFastRefreshUntil()`; `pendingAction` resolves when all appropriate services reach target state.
+- **Container detection**: `detect_containers()` uses `docker compose ps -q` + `docker inspect` to discover actual container names (project-name agnostic).
+- **Start error reporting**: `do_start()` runs `docker compose up -d` as a batch, but on failure inspects `docker compose ps --format json` post-attempt to report per-service results — services that started are marked `"started"`, only failed services get the Docker error message.
 
 ## MCP Server
 
