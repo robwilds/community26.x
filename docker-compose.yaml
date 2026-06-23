@@ -239,8 +239,8 @@ services:
       - openwebuidata:/app/backend/data # Persistent storage for Open WebUI data
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434 # Link to the Ollama service on the host
-    #profiles:
-    #  - donotstart
+    profiles:
+      - donotstart
 
   wildsalfmcp:
     image: wildsdocker/wildsalfmcp:v3
@@ -258,8 +258,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    #profiles:
-    #- donotstart
+    profiles:
+      - donotstart
   ldap:
     image: bitnamilegacy/openldap:latest
     ports:
@@ -304,8 +304,8 @@ services:
       #- ./data/services/email/domainlist.xml:/root/conf/domainlist.xml
       - ./data/services/email/initialdata.sh:/root/initialdata.sh
       - emaildata:/var/store
-    #profiles:
-    #  - donotstart
+    profiles:
+      - donotstart
   webmail:
     image: hardware/rainloop:latest
     volumes:
@@ -315,8 +315,8 @@ services:
       - 8800:8888
     depends_on:
       - email
-    #profiles:
-    #  - donotstart
+    profiles:
+      - donotstart
 volumes:
   alf_data:
   postgresdata:
