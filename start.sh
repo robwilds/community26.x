@@ -14,6 +14,7 @@ echo -n "Waiting for server"
 for i in $(seq 1 30); do
   if curl -sf http://localhost:9700 >/dev/null 2>&1; then
     echo " ready."
+    echo "Control Plane: http://localhost:9700"
     open http://localhost:9700
     break
   fi
