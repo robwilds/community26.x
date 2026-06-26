@@ -70,7 +70,7 @@ Web UI at `http://localhost:9700` for managing Docker services without CLI.
 
 #### UI Panels
 
-- **Services panel** — sorted with alfresco/share first, per-service Start/Stop/Restart buttons, collapsible log accordion, Dozzle ↗ link, profile badge for donotstart services, inline alfresco-global.properties editor, animated Alfresco wait banner
+- **Services panel** — sorted with alfresco/share first, per-service Start/Stop/Restart buttons, collapsible log accordion, Dozzle ↗ link, profile badge for donotstart services, inline alfresco-global.properties editor, animated Alfresco wait banner; services transitioning to running show an animated "starting…" indicator with pulsing dot
 - **Available Files** — grouped by Content/Share tabs, Install AMP/JAR buttons with (done) state, Delete with warning, Upload File, **Install All** button
 - **AMPs panel** — installed modules (title, version, ID, service badge) with Remove, Available (in installs/) with Install, Pending (filtered against MMT), All Services/Alfresco/Share tabs
 - **JARs panel** — installed JARs (only tracked ones show Remove), Available with Install, All Services tab with service badges
@@ -88,7 +88,8 @@ Web UI at `http://localhost:9700` for managing Docker services without CLI.
 #### Auto-Refresh
 
 - Services/AMPs/JARs/files refresh every 5 seconds
-- During pending start/stop/restart actions, fast-refresh at 1s intervals via `startFastRefreshUntil()`
+- During pending start/stop/restart actions, fast-refresh at 1s intervals via `startFastRefreshUntil()` — applies to both **Start All** and individual **Start/Restart** buttons
+- A `startingServices` Set tracks per-service start requests and shows a "starting…" indicator on the service row until the container reports healthy
 - Pending action completes when all (appropriate) services reach target state
 
 #### Click Handler Pattern

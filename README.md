@@ -30,6 +30,7 @@ Lists all services from `docker-compose.yaml` sorted with **alfresco** and **sha
 Per-service controls:
 
 - **Start** / **Stop** / **Restart** buttons
+- **"starting…" indicator** — when a service is starting (via bulk or per-service start), its status row shows an animated pulsing dot with "starting…" text that persists until the container reports healthy
 - **▶ Show Logs** accordion — expands to show the last 20 log lines (fetched via `docker logs --tail 20 --timestamps`), collapsed by default
 - **Dozzle ↗** link — opens that container's logs in Dozzle (http://localhost:9999)
 - **▶ Edit Global Properties** button (alfresco only) — inline textarea editor for `alfresco-global.properties` with Save/Discard & Reload buttons and a status indicator
@@ -91,7 +92,7 @@ After installing an AMP, JAR, saving properties, or uninstalling an AMP, a **Res
 
 ## Auto-Refresh
 
-All panels (services, AMPs, JARs, files) refresh every 5 seconds. During a pending start, stop, or restart action, the refresh interval accelerates to 1 second via `startFastRefreshUntil()`. The pending action completes when all appropriate services (excluding `donotstart` profile) reach the target state. Use the **Refresh** button to force-update all panels immediately.
+All panels (services, AMPs, JARs, files) refresh every 5 seconds. During a pending start, stop, or restart action (both **Start All** and individual **Start/Restart**), the refresh interval accelerates to 1 second via `startFastRefreshUntil()`. The pending action completes when all appropriate services (excluding `donotstart` profile) reach the target state. Use the **Refresh** button to force-update all panels immediately.
 
 ## Guided Tour
 
