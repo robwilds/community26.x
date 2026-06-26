@@ -1295,6 +1295,11 @@
       }
 
       async function svcAction(action, name) {
+  // When starting or restarting an individual service, switch to fast refresh (1‑second interval)
+  // so the UI updates quickly until the container reaches the desired state.
+  if (action === 'start' || action === 'restart') {
+    startFastRefreshUntil(action);
+  }
         showToast(`${action} ${name}...`, "info");
         const endpoint = `/api/${action}`;
         const res = await api(endpoint, {
@@ -1949,7 +1954,31 @@
         showRestartPrompt(svc);
       }
 
-      async function startAll(force) {
+      function startAll(force) {
+  const btn = document.getElementById("start-all-btn");
+  btn.disabled = true;
+  if (!force) {
+    try {
+      const quay = await api("/api/docker/quay-status");
+      if (quay.needs_login) {
+        btn.disabled = false;
+        showQuayLogin();
+        return;
+      }
+    } catch (e) {}
+  }
+  // Use fast refresh while containers start up
+  startFastRefreshUntil('start');
+  await pullAndStart([]);
+  // The pullAndStart already sets startPromptDismissed; waiting banner handling remains unchanged
+  startFastRefreshUntil('start'); // ensure fast refresh continues until start completes
+  waitingForAlfresco = true;
+  alfrescoPromptShown = false;
+  prevAlfrescoRunning = false;
+  updateWaitBanner();
+  btn.disabled = false;
+}
+
         const btn = document.getElementById("start-all-btn");
         btn.disabled = true;
         if (!force) {
