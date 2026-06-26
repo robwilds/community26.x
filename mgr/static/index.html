@@ -1954,7 +1954,7 @@
         showRestartPrompt(svc);
       }
 
-      function startAll(force) {
+      async function startAll(force) {
   const btn = document.getElementById("start-all-btn");
   btn.disabled = true;
   // Ensure the start prompt will not reappear for this page load
@@ -1975,61 +1975,18 @@
   startFastRefreshUntil('start');
   await pullAndStart([]);
   // After a successful pull-and-start we already set startPromptDismissed at the start
-  waitingForAlfresco = true;
-  alfrescoPromptShown = false;
-  prevAlfrescoRunning = false;
-  updateWaitBanner();
-  btn.disabled = false;
+waitingForAlfresco = true;
+    alfrescoPromptShown = false;
+    prevAlfrescoRunning = false;
+    updateWaitBanner();
+    await refreshAll();
+    btn.disabled = false;
 }
 
-  const btn = document.getElementById("start-all-btn");
-  btn.disabled = true;
-  if (!force) {
-    try {
-      const quay = await api("/api/docker/quay-status");
-      if (quay.needs_login) {
-        btn.disabled = false;
-        showQuayLogin();
-        return;
-      }
-    } catch (e) {}
-  }
-  // Use fast refresh while containers start up
-  startFastRefreshUntil('start');
-  await pullAndStart([]);
-  // The pullAndStart already sets startPromptDismissed; waiting banner handling remains unchanged
-  startFastRefreshUntil('start'); // ensure fast refresh continues until start completes
-  waitingForAlfresco = true;
-  alfrescoPromptShown = false;
-  prevAlfrescoRunning = false;
-  updateWaitBanner();
-  btn.disabled = false;
+
 }
 
-        const btn = document.getElementById("start-all-btn");
-        btn.disabled = true;
-        if (!force) {
-          try {
-            const quay = await api("/api/docker/quay-status");
-            if (quay.needs_login) {
-              btn.disabled = false;
-              showQuayLogin();
-              return;
-            }
-          } catch (e) {
-            // If check fails, proceed anyway
-          }
-        }
-        await pullAndStart([]);
-      // After a successful pull-and-start we have already asked the user, so suppress the start prompt
-      startPromptDismissed = true;
-        startFastRefreshUntil('start');
-        waitingForAlfresco = true;
-        alfrescoPromptShown = false;
-        prevAlfrescoRunning = false;
-        updateWaitBanner();
-        btn.disabled = false;
-      }
+
 
       async function stopAll() {
         const btn = document.getElementById("stop-all-btn");
