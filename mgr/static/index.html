@@ -1965,6 +1965,8 @@
           }
         }
         await pullAndStart([]);
+      // After a successful pull-and-start we have already asked the user, so suppress the start prompt
+      startPromptDismissed = true;
         startFastRefreshUntil('start');
         waitingForAlfresco = true;
         alfrescoPromptShown = false;
@@ -2159,6 +2161,9 @@
       }
 
       function acceptStartPrompt() {
+  // Once the user has confirmed they want to start services, we never need to show the start prompt again
+  // for this page load. Mark it dismissed so subsequent refreshes don't re‑show the overlay.
+  startPromptDismissed = true;
         document.getElementById("start-overlay").classList.add("hidden");
         startAll();
       }
