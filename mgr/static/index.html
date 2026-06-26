@@ -140,6 +140,14 @@
       .status-dot.not-found {
         background: var(--muted);
       }
+      .status-dot.starting {
+        background: var(--accent);
+        animation: pulse 0.8s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
 
       .grid {
         display: grid;
@@ -1031,7 +1039,8 @@
       let alfrescoPromptShown = false;
       let prevAlfrescoRunning = false;
 
-      let pendingRestartContainer = null;
+      let startingServices = new Set();
+let pendingRestartContainer = null;
       let refreshInterval;
       let pendingAction = null;
       let waitingForAlfresco = false;
@@ -1057,6 +1066,7 @@
         }
         if (done) {
           pendingAction = null;
+          startingServices.clear();
           restoreNormalRefresh();
         }
       }
@@ -1217,8 +1227,13 @@
         let html =
           "<table><thead><tr><th>Service</th><th>Status</th><th></th></tr></thead><tbody>";
         for (const s of data) {
-          const statusClass = s.running ? "healthy" : "not-found";
-          const statusLabel = s.running ? "running" : "stopped";
+          // If service is now running, remove from starting‑tracking set
+          if (s.running && startingServices.has(s.name)) {
+            startingServices.delete(s.name);
+          }
+          const isStarting = !s.running && (startingServices.has(s.name) || (pendingAction === 'start' && isAppropriate(s)));
+          const statusClass = s.running ? "healthy" : isStarting ? "starting" : "not-found";
+          const statusLabel = s.running ? "running" : isStarting ? "starting…" : "stopped";
           const profileTag = s.profile_name
             ? ` <span class="badge not-found" style="font-size:9px;vertical-align:middle">profile: ${esc(s.profile_name)}</span>`
             : "";
@@ -1295,8 +1310,10 @@
       }
 
       async function svcAction(action, name) {
-  // When starting or restarting an individual service, switch to fast refresh (1‑second interval)
-  // so the UI updates quickly until the container reaches the desired state.
+  // Track starting services so the UI shows a persistent "starting…" indicator
+  if (action === 'start') {
+    startingServices.add(name);
+  }
   if (action === 'start' || action === 'restart') {
     startFastRefreshUntil(action);
   }
@@ -1307,6 +1324,9 @@
           body: JSON.stringify({ containers: [name] }),
         });
         const msg = res[name] || `${action}ed`;
+        if (msg.startsWith("failed") && action === 'start') {
+          startingServices.delete(name);
+        }
         showToast(
           `${name}: ${msg}`,
           msg.startsWith("failed") ? "error" : "success",
