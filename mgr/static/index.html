@@ -1231,7 +1231,7 @@ let pendingRestartContainer = null;
           if (s.running && startingServices.has(s.name)) {
             startingServices.delete(s.name);
           }
-          const isStarting = !s.running && (startingServices.has(s.name) || (pendingAction === 'start' && isAppropriate(s)));
+          const isStarting = !s.running && (startingServices.has(s.name) || (pendingAction === 'start' && startingServices.size === 0 && isAppropriate(s)));
           const statusClass = s.running ? "healthy" : isStarting ? "starting" : "not-found";
           const statusLabel = s.running ? "running" : isStarting ? "starting…" : "stopped";
           const profileTag = s.profile_name
