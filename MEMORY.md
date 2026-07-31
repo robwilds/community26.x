@@ -52,6 +52,9 @@ Added `do_stop()` (`docker compose stop`) and switched `do_restart()` to `docker
 ### 12. Updated agent guide files (this session)
 Rewrote AGENTS.md, CLAUDE.md, and README.md with comprehensive documentation of all API endpoints, frontend features, overlays/quay-login/pull, properties editor, restart prompt, auto-refresh with fast-refresh, batch "Install All", AMP lifecycle, JAR tracking, background pull threading, YAML profile parsing, and container detection.
 
+### 13. AMP uninstall → available for reinstall
+Changed `do_uninstall_amp()` so that after MMT uninstall it removes the matching `.applied` marker from the container's amps dir (falling back to reverting it to `.amp` when no source exists in `installs/`). Removed AMPs now reappear in **Available** with an enabled **Install AMP** button instead of lingering in **Pending**. Updated README.md, AGENTS.md, CLAUDE.md, and DEMO_SCRIPT.md accordingly. Verified live: uninstalled support-tools-repo, confirmed it showed available, reinstalled to restore state.
+
 ## Files Created/Modified
 - `install_all.sh` — rewritten (dynamic container/MMT detection, root user, restart, health wait)
 - `mgr/server.py` — management API server

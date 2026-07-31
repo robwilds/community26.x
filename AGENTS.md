@@ -1,109 +1,28 @@
-# Project Context
+# Alfresco Community 26.x — Agent Context
 
-Alfresco Community 26.x build with LDAP, Python MCP server, and additional services.
+## Commands
 
-## Key Files
+```bash
+./start.sh                         # Control plane at http://localhost:9700 + opens browser
+python3 mgr/server.py              # Control plane only (no auto-open)
+```
 
-- `docker-compose.yaml` — All service definitions (Alfresco, Share, Solr6, Postgres, ActiveMQ, transform-core-aio, dozzle, etc.)
-- `mgr/server.py` — Control plane HTTP server (Python stdlib http.server)
-- `mgr/static/index.html` — Control plane frontend (vanilla JS, zero deps)
-- `commons/base.yaml` — Shared Compose config (traefik labels, proxy, content-app, control-center)
-- `mgr/data/installed_jars.json` — Persisted tracking of JAR files installed via control plane
-- `start.sh` — Launches control plane server and opens http://localhost:9700
-- `installs/content/` — AMPs/JARs for alfresco service
-- `installs/share/` — AMPs/JARs for share service
+## Architecture
 
-## Control Plane (`mgr/`)
+- **Python backend** (`mgr/server.py`): stdlib `http.server`, all Docker via `subprocess.run`. JSON responses use manual `json.dumps`; no framework.
+- **JS frontend** (`mgr/static/index.html`): 2394 lines, vanilla JS, dark theme CSS vars, zero deps.
+- AMP lifecycle: copy into container → MMT install with `--user root` → rename `.amp` → `.applied`. Uninstall via MMT + remove the `.applied` marker (falls back to renaming it back to `.amp` if no matching source exists in `installs/`), so the source AMP shows up as available again. Only JARs installed through the UI are removable (tracked in `mgr/data/installed_jars.json`).
+- File upload is base64 JSON body (no multipart parser). Delete paths are resolved relative to `installs/*`.
 
-Web UI at `http://localhost:9700` for managing Docker services without CLI.
+## Service model
 
-### Backend (`mgr/server.py`)
+`docker-compose.yaml` defines 18 services; the default `docker compose up -d` (and the UI's **Start All**, which mirrors it via `do_start`) starts the 12 non-profile-gated ones. 6 services behind `profiles: [donotstart]` (`content-app`, `control-center`, `open-webui`, `wildsalfmcp`, `email`, `webmail`) are omitted by default but startable via the per-service button or CLI. Container names come from `docker compose ps`, not `docker-compose.yaml` service keys (project-name agnostic).
 
-- Single-file Python server using `http.server` (stdlib only)
-- All Docker interaction via `subprocess.run` wrapper
-- JAR tracking persisted to `mgr/data/installed_jars.json` — only tracked JARs show Remove button
-- Image pull runs in background thread with streaming output via `_pull_images()` + `_pull_lock`
-- YAML profile parsing (`_parse_compose_profiles`) detects `profiles: [donotstart]` for badge display
-- Service name extraction (`_parse_all_service_names`) reads docker-compose.yaml directly
-- Quay image extraction via `docker compose config --images`
-- AMP module ID detection from zipfile `module.properties`
-- `.applied` file renaming convention: after AMP install, file is renamed `name.applied`
-- Pending AMP filtering: AMPs in container's amps dir are filtered against MMT-installed module IDs
-- Delete path validation resolves path and verifies it's within `installs/` to prevent traversal
-- CORS headers (`Access-Control-Allow-Origin: *`) on all JSON responses
+Service↔directory mapping for installs: `installs/content/` → alfresco (`amps/`, `webapps/alfresco`); `installs/share/` → share (`amps_share/`, `webapps/share`). The properties editor reads/writes `data/services/content/alfresco-global.properties` (bind-mounted into the container).
 
-#### API Endpoints
+## Gotchas
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/services` | List all Compose services with status, container_id, dozzle_url, profile_name |
-| `GET` | `/api/status` | Container health for alfresco/share (healthy/unhealthy) |
-| `GET` | `/api/amps` | Installed + pending + available AMPs (alfresco + share, with module IDs) |
-| `GET` | `/api/available-amps` | AMPs in `installs/` not yet installed |
-| `GET` | `/api/jars` | Installed + available JARs per service (with removable flag) |
-| `GET` | `/api/available-jars` | JARs in `installs/` not yet deployed |
-| `GET` | `/api/local-files` | Files in `installs/` dirs with installed status |
-| `GET` | `/api/docker-status` | Docker daemon check (running/installed) |
-| `GET` | `/api/docker/quay-status` | Check which quay.io images are cached locally |
-| `GET` | `/api/pull-status` | Background pull progress (running/complete/output/error) |
-| `GET` | `/api/properties` | Read `alfresco-global.properties` |
-| `GET` | `/api/logs/<service>` | Last 20 log lines via `docker logs --tail 20 --timestamps` |
-| `POST` | `/api/start` | Start container(s) with `docker compose up -d`; on failure inspects post-start state via `docker compose ps` to report per-service success/failure |
-| `POST` | `/api/stop` | Stop container(s) with `docker compose stop` |
-| `POST` | `/api/restart` | Restart container(s) with `docker compose restart` |
-| `POST` | `/api/properties` | Write `alfresco-global.properties` |
-| `POST` | `/api/install/jar` | Copy JAR into container's `WEB-INF/lib` |
-| `POST` | `/api/install/amp` | Copy AMP + MMT install into container |
-| `POST` | `/api/uninstall/amp` | MMT uninstall + revert .applied → .amp |
-| `POST` | `/api/remove/jar` | Delete JAR from container |
-| `POST` | `/api/upload` | Upload file (base64 JSON) to `installs/` |
-| `POST` | `/api/delete-file` | Delete file from `installs/` (path traversal safe) |
-| `POST` | `/api/launch-docker` | Launch Docker Desktop via `open -a Docker` |
-| `POST` | `/api/docker/login` | Login to quay.io (`docker login quay.io --password-stdin`) |
-| `POST` | `/api/pull` | Start background `docker compose pull` |
-
-### Frontend (`mgr/static/index.html`)
-
-- Vanilla JS, single HTML file, zero dependencies (2394 lines)
-- Global state in `state` object, install tracking in `installing` map
-- Renders via `innerHTML` with `esc()` / `escAttr()` helpers for XSS safety
-
-#### UI Panels
-
-- **Services panel** — sorted with alfresco/share first, per-service Start/Stop/Restart buttons, collapsible log accordion, Dozzle ↗ link, profile badge for donotstart services, inline alfresco-global.properties editor, animated Alfresco wait banner; services transitioning to running show an animated "starting…" indicator with pulsing dot
-- **Available Files** — grouped by Content/Share tabs, Install AMP/JAR buttons with (done) state, Delete with warning, Upload File, **Install All** button
-- **AMPs panel** — installed modules (title, version, ID, service badge) with Remove, Available (in installs/) with Install, Pending (filtered against MMT), All Services/Alfresco/Share tabs
-- **JARs panel** — installed JARs (only tracked ones show Remove), Available with Install, All Services tab with service badges
-
-#### Overlays & Prompts
-
-- **Docker overlay** — three states: not installed (Download Docker Desktop link), not running (Launch Docker + Check Again), waiting (polls every 500ms)
-- **Quay login overlay** — username/password form, shows missing images count, error display
-- **Pull overlay** — streaming `docker compose pull` output, Skip (start anyway) button
-- **Restart prompt** — shows after install/AMP uninstall, "Restart Now" or "Later"
-- **Alfresco ready overlay** — when alfresco health probe passes after transition from stopped
-- **Start prompt** — "Docker is ready but no services running — Start All?"
-- **Guided tour** — 6-step overlay tour on first visit (tracked via localStorage), restartable via `?` button
-
-#### Auto-Refresh
-
-- Services/AMPs/JARs/files refresh every 5 seconds
-- During pending start/stop/restart actions, fast-refresh at 1s intervals via `startFastRefreshUntil()` — applies to both **Start All** and individual **Start/Restart** buttons
-- A `startingServices` Set tracks per-service start requests and shows a "starting…" indicator on the service row until the container reports healthy
-- Pending action completes when all (appropriate) services reach target state
-
-#### Click Handler Pattern
-
-- Uses `event.target` in `toggleLogs()` to find the toggle button
-- Install buttons show "Installing..." state and are disabled during operation
-- Creates and appends DOM nodes for toast dismiss buttons (not innerHTML)
-
-### Conventions
-
-- **Python:** stdlib only, `subprocess.run` wrapper for Docker commands, `http.server` with manual JSON serialization
-- **JS:** `async/await`, `fetch` API, `innerHTML` for rendering, anonymous functions in render callbacks
-- **CSS:** dark theme CSS variables (--bg, --card, --border, --text, --muted, --accent, etc.), no frameworks
-- **Docker:** `docker compose` v2 commands, `cwd=str(PROJECT_ROOT)` for compose operations
-- **AMP lifecycle:** copy to container → MMT install → rename .amp → .applied; uninstall reverses via MMT + renames back
-- **JAR tracking:** only JARs installed through the UI are removable (stored in `mgr/data/installed_jars.json`)
-- **Styling:** Hyland teal/gold brand colors, Inter font from Google Fonts, Hyland SVG logo in header
+- AMP install needs `--user root`; skipping it causes IO errors because webapps/WEB-INF belong to root, container runs as non-root.
+- MMT jar path is resolved at runtime via `_resolve_mmt_jar()` (`docker exec ls /usr/local/tomcat/alfresco-mmt/*.jar`) so image upgrades are picked up automatically; `DEFAULT_MMT_JAR` is only a fallback.
+- Start error reporting uses `docker compose ps --format json` post-attempt for per-service success/failure; don't assume the batch failed only if any single service reports error on this basis.
+- Background pull (`docker compose pull`) streams line-by-line through a thread-safe `_pull_state` dict protected by lock.

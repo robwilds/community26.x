@@ -65,7 +65,7 @@ Upload:
 
 Alfresco and Share tabs, plus an **All Services** tab aggregating both. Each tab shows:
 
-- **Installed** — modules in a table (Title, Version, ID) with a **Remove** button per module
+- **Installed** — modules in a table (Title, Version, ID) with a **Remove** button per module (MMT uninstall; the module then reappears in **Available** for reinstall)
 - **Available (in installs/)** — AMP files from the local `installs/` directory not yet installed, with **Install** buttons
 - **Pending** — AMP files in the container's `amps/` or `amps_share/` directory (filtered to exclude AMPs already installed via MMT)
 
@@ -131,7 +131,7 @@ While waiting for Alfresco to become healthy (e.g., during start or restart), an
 - **Service ordering**: `list_services()` sorts with alfresco (priority 0) and share (priority 1) first, then alphabetical.
 - **Profile detection**: `_parse_compose_profiles()` uses regex to parse `profiles: [donotstart]` from the YAML directly for badge display.
 - **Service name extraction**: `_parse_all_service_names()` reads `docker-compose.yaml` directly to capture all services (including profile-gated ones). Merged with `docker compose config --services` output.
-- **AMP lifecycle**: Files are renamed `.amp` → `.applied` after MMT install; uninstall reverses via MMT + renames back to `.amp`.
+- **AMP lifecycle**: Files are renamed `.amp` → `.applied` after MMT install. Uninstall runs MMT and removes the matching `.applied` marker from the container (or reverts it to `.amp` if no source exists in `installs/`), so the AMP shows up as **Available** again for reinstall.
 - **JAR tracking**: Only JARs installed through the UI are removable. Persisted to `mgr/data/installed_jars.json`.
 - **Background pull**: `docker compose pull` runs in a background threading with line-by-line streaming. State tracked via `_pull_state` dict protected by `_pull_lock`.
 - **Delete path validation**: `/api/delete-file` resolves the path and verifies it's within `installs/` to prevent directory traversal.

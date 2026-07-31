@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 COMPOSE_DIR = PROJECT_ROOT
 TRACKED_JARS_FILE = Path(__file__).parent / "data" / "installed_jars.json"
 ALFRESCO_GLOBAL_PROPERTIES = PROJECT_ROOT / "data" / "services" / "content" / "alfresco-global.properties"
+DEFAULT_MMT_JAR = "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.2.0.96.jar"
 
 ALFRESCO_CONTAINER = None
 SHARE_CONTAINER = None
@@ -133,6 +134,25 @@ def _get_amp_module_id(local_path):
     return None
 
 
+def _resolve_mmt_jar(container):
+    """Locate the MMT jar in a running container (dynamic version detection).
+
+    Probes /usr/local/tomcat/alfresco-mmt/*.jar so the version tracks whatever
+    image is actually running; falls back to DEFAULT_MMT_JAR when unavailable.
+    """
+    if not container:
+        return DEFAULT_MMT_JAR
+    r = run(
+        [
+            "docker", "exec", "--user", "root", container,
+            "sh", "-c", "ls /usr/local/tomcat/alfresco-mmt/*.jar 2>/dev/null",
+        ],
+        timeout=10,
+    )
+    matches = [line.strip() for line in r.stdout.splitlines() if line.strip().endswith(".jar")]
+    return matches[0] if matches else DEFAULT_MMT_JAR
+
+
 def _get_installed_amp_ids(container, svc):
     """Return set of installed AMP module IDs via MMT list."""
     if not container:
@@ -141,7 +161,7 @@ def _get_installed_amp_ids(container, svc):
     r = run([
         "docker", "exec", container,
         "java", "-jar",
-        "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.1.0.61.jar",
+        _resolve_mmt_jar(container),
         "list", webapp,
     ], timeout=30)
     if r.returncode != 0:
@@ -401,7 +421,7 @@ def api_list_amps(container, svc):
             container,
             "java",
             "-jar",
-            "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.1.0.61.jar",
+            _resolve_mmt_jar(container),
             "list",
             "/usr/local/tomcat/webapps/alfresco"
             if svc == "alfresco"
@@ -598,7 +618,7 @@ def do_install_amp(container, filename, svc):
             container,
             "java",
             "-jar",
-            "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.1.0.61.jar",
+            _resolve_mmt_jar(container),
             "install",
             f"/usr/local/tomcat/{amps_dir}",
             f"/usr/local/tomcat/webapps/{webapp}",
@@ -629,15 +649,19 @@ def do_uninstall_amp(container, module_id, svc):
     r = run([
         "docker", "exec", "--user", "root", container,
         "java", "-jar",
-        "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.1.0.61.jar",
+        _resolve_mmt_jar(container),
         "uninstall", module_id,
         f"/usr/local/tomcat/webapps/{webapp}",
     ], timeout=30)
     if r.returncode != 0:
         return {"error": f"uninstall failed: {r.stderr or r.stdout}"}
-    # Find the matching .applied file and rename it back to .amp
+    # Remove the matching .applied marker from the container's amps dir so the
+    # source AMP in installs/ shows up as available to install again. If no local
+    # source exists, keep the file by reverting it to .amp (pending) to avoid
+    # losing it.
     ls = run(["docker", "exec", container, "ls", f"/usr/local/tomcat/{amps_dir}/"], timeout=10)
-    renamed = False
+    installs_dir = PROJECT_ROOT / "installs" / ("content" if svc == "alfresco" else "share")
+    action = ""
     if ls.returncode == 0:
         with tempfile.TemporaryDirectory() as tmp:
             for fname in ls.stdout.splitlines():
@@ -653,16 +677,21 @@ def do_uninstall_amp(container, module_id, svc):
                         with zf.open("module.properties") as f:
                             for line in f.read().decode().splitlines():
                                 if line.strip() == f"module.id={module_id}":
-                                    run(["docker", "exec", "--user", "root", container,
-                                         "mv", f"/usr/local/tomcat/{amps_dir}/{fname}",
-                                         f"/usr/local/tomcat/{amps_dir}/{base}.amp"])
-                                    renamed = True
+                                    if (installs_dir / f"{base}.amp").exists():
+                                        run(["docker", "exec", "--user", "root", container,
+                                             "rm", f"/usr/local/tomcat/{amps_dir}/{fname}"])
+                                        action = " and available for reinstall"
+                                    else:
+                                        run(["docker", "exec", "--user", "root", container,
+                                             "mv", f"/usr/local/tomcat/{amps_dir}/{fname}",
+                                             f"/usr/local/tomcat/{amps_dir}/{base}.amp"])
+                                        action = " (kept as pending .amp)"
                                     break
                 except Exception:
                     pass
-                if renamed:
+                if action:
                     break
-    return {"success": True, "message": f"{module_id} removed{' and .applied reverted to .amp' if renamed else ''}"}
+    return {"success": True, "message": f"{module_id} removed{action}"}
 
 
 def do_install_jar(container, filename, svc):

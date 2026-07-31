@@ -134,6 +134,9 @@ Record your screen at 1920×1080. Start with the control plane already open at h
 **Actions**:
 - Point to the **Installed** table — Title, Version, ID columns, each with a **Remove** button
 - "Every installed AMP can be removed, even those baked into the image."
+- Click **Remove** on an installed AMP
+- Toast: "removed and available for reinstall"
+- "The AMP is uninstalled and reappears in Available, ready to be reinstalled with one click."
 - Point to the **Available (in installs/)** section below — lists AMPs in the local installs/ directory with **Install** buttons
 - "Available AMPs can be installed directly from the browser."
 - Point to the **Pending** section — lists AMP files in the container's amps dir (filtered to exclude already-installed AMPs)
