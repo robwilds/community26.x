@@ -29,6 +29,21 @@
           "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
           monospace;
       }
+
+      .light-theme {
+        --bg: #f8f9fa;
+        --card: #ffffff;
+        --border: #dee2e6;
+        --text: #212529;
+        --muted: #6c757d;
+        --accent: #0d6efd;
+        --accent2: #6610f2;
+        --green: #198754;
+        --red: #dc3545;
+        --orange: #fd7e14;
+        --hyland-teal: #20c997;
+        --hyland-gold: #ffc107;
+      }
       * {
         margin: 0;
         padding: 0;
@@ -804,17 +819,26 @@
           control plane
         </h1>
       </div>
-      <div class="header-actions">
-        <a
-          href="http://localhost:8080"
-          target="_blank"
-          rel="noopener"
-          class="btn btn-primary btn-sm"
-          id="alfresco-link-btn"
-          style="display: none"
-          >Open Alfresco &#8599;</a
-        >
-        <span id="services-summary" class="badge">loading</span>
+<div class="header-actions">
+  <a
+    href="#"
+    target="_blank"
+    rel="noopener"
+    class="btn btn-primary btn-sm"
+    id="alfresco-link-btn"
+    style="display: none"
+    >Open Alfresco &#8599;</a
+  >
+  <a
+    href="#"
+    target="_blank"
+    rel="noopener"
+    class="btn btn-primary btn-sm"
+    id="kibana-link-btn"
+    style="display: none; margin-left: 8px"
+    >Kibana &#8599;</a
+  >
+  <span id="services-summary" class="badge">loading</span>
         <button
           class="btn btn-primary btn-sm"
           id="start-all-btn"
@@ -836,23 +860,26 @@
         >
           Restart All
         </button>
-        <button
-          class="btn btn-outline btn-sm"
-          onclick="showQuayLogin()"
-          title="Login to quay.io for image pulls"
-        >
-          Quay
-        </button>
-        <button
-          class="btn btn-outline btn-sm"
-          onclick="startTour(true)"
-          title="Show guided tour"
-        >
-          ?
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="refreshAll()">
-          Refresh
-        </button>
+          <button class="btn btn-outline btn-sm" onclick="refreshAll()">
+            Refresh
+          </button>
+<button class="btn btn-outline btn-sm" id="theme-toggle" title="Toggle dark/light mode" onclick="toggleTheme()" style="padding: 4px 8px; line-height: 1;">
+  <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <!-- Moon (dark theme) - left half -->
+    <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
+          stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
+    <!-- Sun (light theme) - right half -->
+    <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
+          stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+          <button
+            class="btn btn-outline btn-sm"
+            onclick="startTour(true)"
+            title="Show guided tour"
+          >
+            ?
+          </button>
       </div>
     </div>
 
@@ -951,16 +978,16 @@
       waiting for Alfresco…
     </div>
 
-    <div class="disclaimer-banner">
-      This demo utilizes a sample custom UI to help showcase what is possible
-      with Docker and the Alfresco platform. This is not a productized UI/UX
-      that is delivered as part of Alfresco Community.
-    </div>
+<div class="disclaimer-banner">
+  This demo utilizes a sample custom UI to help showcase what is possible
+  with Docker and the Alfresco platform. This is not a productized UI/UX
+  that is delivered as part of Alfresco Community.
+</div>
 
-    <div class="card full" style="margin-bottom: 16px">
-      <h2>Services <small>docker compose</small></h2>
-      <div id="services-list"></div>
-    </div>
+<div class="card full" style="margin-bottom: 16px">
+  <h2>Services <small>docker compose</small></h2>
+  <div id="services-list"></div>
+</div>
 
     <div class="card full" style="margin-bottom: 16px">
       <h2>Available Files <small>installs/ directory</small></h2>
@@ -1024,6 +1051,41 @@
       let logCache = {};
       let propertiesOpen = false;
       let propertiesDraft = null;
+      let currentTheme = localStorage.getItem('theme') || 'dark';
+
+function setTheme(theme) {
+  currentTheme = theme;
+  const icon = document.getElementById('theme-icon');
+  if (theme === 'light') {
+    document.documentElement.classList.add('light-theme');
+    icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <!-- Moon (dark theme) - left half -->
+      <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
+            stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
+      <!-- Sun (light theme) - right half -->
+      <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
+            stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  } else {
+    document.documentElement.classList.remove('light-theme');
+    icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <!-- Moon (dark theme) - left half -->
+      <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
+            stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
+      <!-- Sun (light theme) - right half -->
+      <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
+            stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+  localStorage.setItem('theme', theme);
+}
+
+      function toggleTheme() {
+        setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      }
+
+      // Initialize theme on load
+      setTheme(currentTheme);
 
       function escHtml(str) {
         var d = document.createElement('div');
@@ -1216,8 +1278,18 @@ let pendingRestartContainer = null;
         summary.className = `badge ${running === total ? "healthy" : total > 0 ? "unhealthy" : "not-found"}`;
         summary.innerHTML = `<span class="status-dot ${running === total ? "healthy" : total > 0 ? "unhealthy" : "not-found"}"></span>${running}/${total} running`;
 
-        const link = document.getElementById("alfresco-link-btn");
-        link.style.display = running > 0 ? "" : "none";
+        const baseUrl = `${window.location.protocol}//${window.location.hostname}`;
+        
+        // Update Alfresco link
+        const alfrescoLink = document.getElementById("alfresco-link-btn");
+        alfrescoLink.href = `${baseUrl}:8080`;
+        alfrescoLink.style.display = running > 0 ? "" : "none";
+        
+        // Update Kibana link
+        const kibanaLink = document.getElementById("kibana-link-btn");
+        kibanaLink.href = `${baseUrl}:5601`;
+        const kibanaRunning = data.some(s => s.name === "kibana" && s.running);
+        kibanaLink.style.display = kibanaRunning ? "" : "none";
 
         const el = document.getElementById("services-list");
         if (propertiesOpen) {

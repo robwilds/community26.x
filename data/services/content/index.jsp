@@ -45,12 +45,16 @@ alfrescoContext.getRequestDispatcher("/AosResponder_ServerRoot"); if(rd != null)
         </div>
 
         <div class="index-list">
-          <h2>Core Features</h2>
-          <p>
-            <a href="http://docs.alfresco.com/" target="_blank"
-              >Online Documentation</a
-            >
-          </p>
+           <h2>Core Features</h2>
+           <p>
+             <a href="http://docs.alfresco.com/" target="_blank"
+               >Online Documentation</a
+             >
+           </p>
+           <p></p>
+           <p>
+             <a href="#" id="kibana-link" target="_blank">Kibana</a>
+           </p>
           <p></p>
           <% if(alfrescoInstalled) { %>
           <p>
@@ -136,7 +140,12 @@ alfrescoContext.getRequestDispatcher("/AosResponder_ServerRoot"); if(rd != null)
       Alfresco Software, Inc. &copy; 2005-2023 All rights reserved.
     </div>
   </body>
-  <script>
-    console.log(window.location.hostname);
-  </script>
+   <script>
+     console.log(window.location.hostname);
+     // Set Kibana link dynamically
+     var kibanaLink = document.getElementById('kibana-link');
+     if (kibanaLink) {
+         kibanaLink.href = window.location.protocol + '//' + window.location.hostname + ':5601';
+     }
+   </script>
 </html>

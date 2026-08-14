@@ -40,6 +40,8 @@ Global controls:
 - **Start All** / **Stop All** / **Restart All** buttons
 - **Refresh** button
 - Status badge showing `X/Y running` — green when all running, red otherwise
+- **Open Alfresco** / **Kibana** links — appear in the header when respective services are running (Alfresco on port 8080, Kibana on port 5601)
+- Dark mode toggle button with moon/sun icon in the header
 
 Services with `profiles: [donotstart]` are tagged with a badge and excluded from the default start.
 

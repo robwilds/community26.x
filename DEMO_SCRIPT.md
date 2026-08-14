@@ -26,7 +26,7 @@ Record your screen at 1920×1080. Start with the control plane already open at h
 **Visual**: Services table showing alfresco, share, then alphabetical services.
 
 **Narration**:
-> "The Services panel lists every service from our docker-compose file. Alfresco and Share always appear first, followed by the rest alphabetically. Services with a `profiles: [donotstart]` config get a badge and are excluded from the default start. Each service shows a green or red status dot, and we have Start, Stop, and Restart controls per service or globally."
+> "The Services panel lists every service from our docker-compose file. Alfresco and Share always appear first, followed by the rest alphabetically. Services with a `profiles: [donotstart]` config get a badge and are excluded from the default start. Each service shows a green or red status dot, and we have Start, Stop, and Restart controls per service or globally. When the Alfresco service is running, an 'Open Alfresco ↗' link appears in the header, and when Kibana is running, a 'Kibana ↗' link appears next to it for direct access to those services."
 
 **Actions**:
 - Scroll slowly down the service list
@@ -37,6 +37,10 @@ Record your screen at 1920×1080. Start with the control plane already open at h
 - Point to the status changing to red, global Stop All button disabling
 - Click the **Start** button to bring it back up
 - Toast: "postgres: started"
+- Point to the **Open Alfresco ↗** link appearing in the header
+- Point to the **Kibana ↗** link appearing next to it when Kibana starts
+- Click the **Open Alfresco ↗** link to open Alfresco in a new tab
+- Click the **Kibana ↗** link to open Kibana in a new tab
 
 ---
 

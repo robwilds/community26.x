@@ -82,6 +82,7 @@ Vanilla JS, zero dependencies. Dark theme CSS variables. Renders via `innerHTML`
 
 ### UI sections
 - **Services** — table with per-service Start/Stop/Restart, log accordion, Dozzle link, properties editor for alfresco, profile badges for donotstart
+- **Header** — Alfresco and Kibana links appear when services are running, dark/light mode toggle with moon/sun icon
 - **Available Files** — Content/Share tabs, Install AMP/JAR with (done) state, Delete, Upload, **Install All** batch button
 - **AMPs** — All Services / Alfresco / Share tabs with Installed (table), Available, Pending sections
 - **JARs** — same tab structure, only tracked JARs show Remove button
@@ -102,3 +103,5 @@ Services with `profiles: [donotstart]` excluded by default: content-app, control
 ## VSCode MCP
 
 `.vscode/mcp.json` configures SSE MCP server at `http://localhost:8000/sse` (wildsalfmcp container).
+# currentDate
+Today's date is 2026-08-14.
