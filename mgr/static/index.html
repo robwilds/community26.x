@@ -635,7 +635,13 @@
         font-size: 11px;
         color: var(--muted);
       }
-    </style>
+    #theme-text {
+    color: var(--text);
+}
+.light-theme #theme-text {
+    color: #000;
+}
+</style>
   </head>
   <body>
     <div id="docker-overlay" class="docker-overlay hidden">
@@ -863,16 +869,11 @@
           <button class="btn btn-outline btn-sm" onclick="refreshAll()">
             Refresh
           </button>
-<button class="btn btn-outline btn-sm" id="theme-toggle" title="Toggle dark/light mode" onclick="toggleTheme()" style="padding: 4px 8px; line-height: 1;">
-  <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-    <!-- Moon (dark theme) - left half -->
-    <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
-          stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
-    <!-- Sun (light theme) - right half -->
-    <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
-          stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</button>
+<label style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid var(--border-color, #6b7280); border-radius: 20px; background: var(--bg); cursor: pointer;">
+  <input type="checkbox" id="theme-toggle" title="Toggle dark/light mode" onchange="toggleTheme()" style="margin:0;" />
+    <span id="theme-icon"></span>
+  <span id="theme-text" style="font-size: 12px; font-weight: 500; letter-spacing: 0.5px;">Dark</span>
+</label>
           <button
             class="btn btn-outline btn-sm"
             onclick="startTour(true)"
@@ -1055,28 +1056,27 @@
 
 function setTheme(theme) {
   currentTheme = theme;
-  const icon = document.getElementById('theme-icon');
-  if (theme === 'light') {
-    document.documentElement.classList.add('light-theme');
-    icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <!-- Moon (dark theme) - left half -->
-      <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
-            stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
-      <!-- Sun (light theme) - right half -->
-      <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
-            stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`;
-  } else {
-    document.documentElement.classList.remove('light-theme');
-    icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <!-- Moon (dark theme) - left half -->
-      <path id="theme-icon-moon" d="M21 12.79A9 9 0 1 1 11.21 3" 
-            stroke="#fde012" stroke-width="3" stroke-linecap="round"/>
-      <!-- Sun (light theme) - right half -->
-      <path id="theme-icon-sun" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-1.414-1.414M6.343 17.657l-1.414-1.414m14.142-14.142l-1.414 1.414M7.757 4.243l1.414 1.414M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" 
-            stroke="#f1cb61" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`;
-  }
+    // Toggle light theme class
+    if (theme === 'light') {
+        document.documentElement.classList.add('light-theme');
+    } else {
+        document.documentElement.classList.remove('light-theme');
+    }
+    // Ensure no icon is displayed
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+        icon.innerHTML = '';
+    }
+    localStorage.setItem('theme', theme);
+    // Update the checkbox state and label text
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+      toggle.checked = (theme === 'dark');
+    }
+    const themeLabel = document.getElementById('theme-text');
+    if (themeLabel) {
+      themeLabel.textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+    }
   localStorage.setItem('theme', theme);
 }
 
