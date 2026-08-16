@@ -663,6 +663,9 @@
             <button class="btn btn-outline" onclick="retryDockerCheck()">
               Check Again
             </button>
+            <button class="btn btn-outline" onclick="ignoreDockerCheck()">
+              Ignore
+            </button>
           </div>
         </div>
         <div id="docker-not-installed" style="display: none">
@@ -2500,6 +2503,13 @@ waitingForAlfresco = true;
           refreshInterval = setInterval(doRefresh, 5000);
         }
       });
-    </script>
+    async function ignoreDockerCheck() {
+      document.getElementById('docker-overlay').classList.add('hidden');
+      dockerReady = true;
+      localStorage.setItem('dockerIgnored', 'true');
+      refreshAll();
+      refreshInterval = setInterval(doRefresh, 5000);
+    }
+</script>
   </body>
 </html>
