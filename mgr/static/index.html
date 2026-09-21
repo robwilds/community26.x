@@ -312,6 +312,42 @@
         font-family: "SF Mono", "Fira Code", monospace;
         font-size: 11px;
       }
+      .diff-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .diff-table th {
+        position: sticky;
+        top: 0;
+        background: var(--card);
+        z-index: 1;
+      }
+      .diff-row td {
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(42, 45, 58, 0.5);
+        vertical-align: middle;
+      }
+      .diff-row:hover td {
+        background: rgba(79, 140, 255, 0.04);
+      }
+      .diff-name {
+        font-weight: 500;
+        color: var(--text);
+        white-space: nowrap;
+      }
+      .diff-old {
+        color: var(--red);
+        text-decoration: line-through;
+        word-break: break-all;
+      }
+      .diff-new {
+        color: var(--green);
+        font-weight: 600;
+        word-break: break-all;
+      }
+      .diff-skip {
+        color: var(--orange);
+      }
 
       .toast {
         position: fixed;
@@ -1012,14 +1048,16 @@
       <div id="files-alfresco" class="tab-content active"></div>
       <div id="files-share" class="tab-content"></div>
       <div id="files-compose" class="tab-content">
-      <div class="file-list">
-        <!-- Compose files will be rendered here -->
+        <div class="file-list">
+          <!-- Compose files will be rendered here -->
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <input type="file" id="file-input-compose" accept=".yaml,.yml" style="display:none" onchange="uploadComposeFile('commons/base.yaml')">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-compose').click()">Upload File</button>
+          <button class="btn btn-primary btn-sm" onclick="syncComposeFile('commons/base.yaml')">🔄 Sync base.yaml</button>
+          <button class="btn btn-primary btn-sm" onclick="syncComposeFile('docker-compose.yaml')">🔄 Sync docker-compose.yaml</button>
+        </div>
       </div>
-      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-        <input type="file" id="file-input-compose" accept=".yaml,.yml" style="display:none" onchange="uploadComposeFile('commons/base.yaml')">
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-compose').click()">Upload File</button>
-      </div>
-    </div></div>
     </div>
 
     <div class="grid">
@@ -1787,7 +1825,7 @@ let pendingRestartContainer = null;
             html += `<span class="file-item">
         <span>${statusBadge}</span>
         <span>${esc(name)}</span>
-        <button class="btn btn-primary btn-sm" onclick="syncCompose('${name}')" title="Sync from remote template">🔄</button>
+        <button class="btn btn-primary btn-sm" onclick="syncComposeFile('${name}')" title="Sync from remote template">🔄</button>
       </span>`;
           }
         }
@@ -2601,123 +2639,174 @@ waitingForAlfresco = true;
       refreshInterval = setInterval(doRefresh, 5000);
     }
 
+    const REMOTE_COMPOSE_URLS = {
+      "docker-compose.yaml": "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/community-compose.yaml",
+      "commons/base.yaml": "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/commons/base.yaml",
+    };
+
     async function syncComposeVersions() {
-      const btn = document.querySelector("button[onclick*=\"syncComposeVersions\"]");
+      await syncComposeFile("docker-compose.yaml");
+    }
+
+    async function syncComposeFile(filename) {
+      const btn = event.target;
       if (!btn) return;
+      const origLabel = btn.textContent;
       btn.disabled = true;
       btn.textContent = "Syncing...";
-      const remoteUrl = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/community-compose.yaml";
       try {
+        const remoteUrl = REMOTE_COMPOSE_URLS[filename];
+        if (!remoteUrl) throw new Error("Unknown compose file: " + filename);
         const res = await fetch(remoteUrl);
         if (!res.ok) throw new Error(`Failed to fetch remote YAML: ${res.status}`);
         const remoteYaml = await res.text();
         const remoteServices = parseYamlServices(remoteYaml);
-        const localYamlContent = await fetchLocalCompose();
-        const localServices = parseYamlServices(localYamlContent);
-        let updated = false;
-        const changes = [];
-        const localSvcNames = Object.keys(localServices).sort();
-        const remoteSvcNames = Object.keys(remoteServices).sort();
-        for (const name of localSvcNames) {
+        const localYaml = await fetchLocalCompose(filename);
+        const localServices = parseYamlServices(localYaml);
+
+        const lines = localYaml.split("\n");
+        const rows = [];
+        for (const name of Object.keys(localServices).sort()) {
           if (!remoteServices[name]) continue;
           const localImage = localServices[name].image || "";
           const remoteImage = remoteServices[name].image || "";
-          if (localImage !== remoteImage) {
-            updated = true;
-            changes.push({ name, localImage, remoteImage });
+          if (localImage === remoteImage) continue;
+          const newImage = normalizeYamlImage(remoteImage);
+          let svcIndex = -1;
+          let imageIndex = -1;
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i] === `  ${name}:`) { svcIndex = i; break; }
           }
+          if (svcIndex !== -1) {
+            for (let i = svcIndex + 1; i < lines.length; i++) {
+              if (/^\S/.test(lines[i])) break;
+              if (/^    image:/.test(lines[i])) { imageIndex = i; break; }
+            }
+          }
+          rows.push({ name, localImage, remoteImage: newImage, svcIndex, imageIndex });
         }
-        if (!updated) {
-          showToast("All local service versions are already up to date with remote.", "success");
-          btn.textContent = "🔄 Update Versions";
-          btn.disabled = false;
+
+        if (rows.length === 0) {
+          showToast(`${filename}: all matching service versions are up to date.`, "success");
           return;
         }
-        const overlay = document.getElementById("sync-overlay") || createSyncOverlay();
-        const overlayEl = overlay ? document.getElementById("sync-overlay") : overlay;
-        const outputEl = overlayEl.querySelector("#sync-output");
-        if (overlayEl) overlayEl.classList.remove("hidden");
-        outputEl.textContent = "";
-        let fullYaml = localYamlContent;
-        let localLineCount = fullYaml.split("\n").length;
-        for (const change of changes) {
-          const remoteFullImage = remoteServices[change.name].image || "";
-          const remoteShort = remoteServices[change.name].image || "";
-          const newImage = normalizeYamlImage(remoteShort);
-          const marker = fullYaml.indexOf("  " + change.name + ":");
-          if (marker === -1) continue;
-          let foundImage = false;
-          let endMarker = -1;
-          for (let i = marker + 1; i < fullYaml.length; i++) {
-            if (fullYaml[i] === "#" && i > marker + 3) {
-              break;
-            }
-            const trimmed = fullYaml.slice(i).trimStart();
-            if (trimmed.startsWith("image:") && !trimmed.startsWith("#") && !trimmed.startsWith("  #")) {
-              foundImage = true;
-              endMarker = i;
-              fullYaml = fullYaml.slice(0, i) + "    " + newImage + "\n" + fullYaml.slice(i);
-              outputEl.textContent += `  ${change.name}: ${change.localImage} → ${newImage}\n`;
-              break;
-            }
-          }
-          if (!foundImage) {
-            outputEl.textContent += `  ${change.name}: No image line found, skipping\n`;
-          }
-        }
-        fullYaml = fullYaml.slice(0, -1) + "\n";
-        const localLineCountOld = fullYaml.split("\n").length;
-        while (localLineCountOld < localLineCount) {
-          fullYaml = fullYaml + "\n";
-          localLineCountOld = fullYaml.split("\n").length;
-        }
-        localStorage.setItem("docker-compose.yaml", fullYaml);
-        overlayEl.querySelector("#sync-output").textContent = outputEl.textContent.trim();
-        if (updated) {
-          await saveDockerCompose(fullYaml);
-          showToast("Versions synchronized successfully. Restart services to apply.", "success");
-          refreshAll();
-        }
+
+        const overlayEl = document.getElementById("sync-overlay") || createSyncOverlay();
+        overlayEl.classList.remove("hidden");
+        overlayEl._sync = { filename, rows, linesYaml: localYaml };
+        renderSyncDiff(overlayEl);
+        const applyBtn = overlayEl.querySelector("#sync-apply");
+        applyBtn.classList.remove("hidden");
+        applyBtn.disabled = false;
+        applyBtn.textContent = "Apply Selected";
+        applyBtn.onclick = () => applySyncSelection(overlayEl);
+        overlayEl.querySelector("#sync-note").textContent =
+          "Select the services to update, then click Apply Selected.";
       } catch (e) {
         showToast("Sync failed: " + e.message, "error");
       } finally {
-        if (overlayEl) overlayEl.classList.add("hidden");
         btn.disabled = false;
-        btn.textContent = "🔄 Update Versions";
+        btn.textContent = origLabel;
+      }
+    }
+
+    function renderSyncDiff(overlay) {
+      const state = overlay._sync;
+      const tbody = overlay.querySelector("#sync-diff");
+      const summaryEl = overlay.querySelector("#sync-summary");
+      const noteEl = overlay.querySelector("#sync-note");
+      tbody.innerHTML = "";
+      summaryEl.textContent = `${state.filename} — ${state.rows.length} service image(s) differ from the remote template`;
+
+      const selectable = state.rows.filter(r => r.imageIndex !== -1).length;
+      noteEl.textContent = `Select the services to update, then click Apply Selected (${selectable} of ${state.rows.length} can be applied).`;
+
+      for (const row of state.rows) {
+        const applyable = row.imageIndex !== -1;
+        const checkbox = applyable
+          ? `<input type="checkbox" class="sync-chk" data-name="${esc(row.name)}" checked>`
+          : '<input type="checkbox" class="sync-chk" disabled>';
+        const oldCell = applyable
+          ? `<span class="diff-old mono">${esc(row.localImage || "(none)")}</span>`
+          : '<span class="diff-skip">no image line found</span>';
+        const status = applyable
+          ? ""
+          : '<span class="badge not-found" style="margin-left:6px">skipped</span>';
+        tbody.innerHTML += `<tr class="diff-row" data-name="${esc(row.name)}">
+          <td class="diff-name"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">${checkbox}<span>${esc(row.name)}</span></label></td>
+          <td>${oldCell}</td>
+          <td><span class="diff-new mono">${esc(row.remoteImage)}</span>${status}</td>
+        </tr>`;
+      }
+    }
+
+    async function applySyncSelection(overlay) {
+      const state = overlay._sync;
+      if (!state) return;
+      const checked = [...overlay.querySelectorAll(".sync-chk:checked")].map(el => el.dataset.name);
+      if (checked.length === 0) {
+        showToast("No services selected.", "error");
+        return;
+      }
+      try {
+        const lines = [...state.linesYaml.split("\n")];
+        const applied = [];
+        for (const row of state.rows) {
+          if (!checked.includes(row.name) || row.imageIndex === -1) continue;
+          lines[row.imageIndex] = `    image: ${row.remoteImage}`;
+          applied.push(row.name);
+        }
+        const fullYaml = lines.join("\n").replace(/\n+$/, "") + "\n";
+        await saveCompose(state.filename, fullYaml);
+
+        const applyBtn = overlay.querySelector("#sync-apply");
+        applyBtn.classList.add("hidden");
+        applyBtn.disabled = true;
+        overlay.querySelector("#sync-note").textContent =
+          `${applied.length} of ${state.rows.length} change(s) saved to ${state.filename}. Restart services to apply.`;
+        for (const rowEl of overlay.querySelectorAll("tr.diff-row")) {
+          if (applied.includes(rowEl.dataset.name)) {
+            const label = rowEl.querySelector(".diff-name label");
+            if (label) {
+              rowEl.querySelector(".diff-new").innerHTML += ' <span class="badge healthy">updated</span>';
+              const chk = rowEl.querySelector(".sync-chk");
+              if (chk) chk.disabled = true;
+            }
+          }
+        }
+        showToast(`${state.filename}: ${applied.length} version(s) updated. Restart services to apply.`, "success");
+        await refreshFiles();
+      } catch (e) {
+        showToast("Apply failed: " + e.message, "error");
       }
     }
 
     function parseYamlServices(yaml) {
-      const lines = yaml.split("\n");
       const services = {};
-      let currentService = null;
+      let current = null;
       let inServices = false;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.match(/^\s*services:\s*$/)) {
+      for (const line of yaml.split("\n")) {
+        if (/^services:\s*$/.test(line)) {
           inServices = true;
+          current = null;
           continue;
         }
-        if (inServices && line.match(/^\s*image:\s*["']?([^"'`\s]+)["']?\s*$/)) {
-          if (currentService) {
-            services[currentService] = { image: line.match(/^.*image:\s*(["']?)([^"'`\s]+)\1/)[2] };
-          }
-          currentService = null;
-          continue;
-        }
-        if (inServices && line.match(/^\s*extends:\s*$/)) {
+        if (inServices && /^\S/.test(line)) {
           inServices = false;
+          current = null;
           continue;
         }
-        if (inServices && line.match(/^\s+\S/)) {
-          const match = line.match(/^\s+([a-zA-Z0-9][a-zA-Z0-9._-]*)/);
-          if (match) {
-            currentService = match[1];
-          }
+        if (!inServices) continue;
+        const svc = line.match(/^  ([\w.-]+):\s*$/);
+        if (svc) {
+          current = svc[1];
+          services[current] = { image: "" };
+          continue;
         }
-      }
-      if (currentService) {
-        services[currentService] = { image: "" };
+        if (current && /^    image:\s*/.test(line)) {
+          const img = line.replace(/^    image:\s*/, "").replace(/^["']|["']$/g, "").trim();
+          if (img) services[current].image = img;
+        }
       }
       return services;
     }
@@ -2736,7 +2825,7 @@ waitingForAlfresco = true;
       const overlay = document.createElement("div");
       overlay.className = "docker-overlay hidden";
       overlay.id = "sync-overlay";
-      overlay.innerHTML = '<div class="modal" style="max-width:520px;text-align:left"><h2 style="text-align:center">Synchronizing Versions</h2><p style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px">Comparing local docker-compose.yaml against remote template. Scroll to see changes.</p><pre id="sync-output" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;font-size:11px;font-family:\'SF Mono\',monospace;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--muted);line-height:1.4;margin:0"></pre><div style="display:flex;justify-content:center;gap:8px;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="dismissSyncOverlay()">Close</button></div></div>';
+      overlay.innerHTML = '<div class="modal" style="max-width:760px;text-align:left"><h2 style="text-align:center">Synchronizing Versions</h2><p id="sync-summary" style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px"></p><div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:6px"><table class="diff-table"><thead><tr><th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Service</th><th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Local (current)</th><th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Remote (new)</th></tr></thead><tbody id="sync-diff"></tbody></table></div><p id="sync-note" style="text-align:center;color:var(--muted);font-size:11px;margin:10px 0 6px"></p><div style="display:flex;justify-content:center;gap:8px;margin-top:12px"><button id="sync-apply" class="btn btn-primary btn-sm hidden">Apply Selected</button><button class="btn btn-outline btn-sm" onclick="dismissSyncOverlay()">Close</button></div></div>';
       document.body.appendChild(overlay);
       return overlay;
     }
@@ -2746,150 +2835,27 @@ waitingForAlfresco = true;
       if (overlay) overlay.classList.add("hidden");
     }
 
-    async function fetchLocalCompose() {
-      try {
-        const res = await fetch("/api/local-files");
-        const data = await res.json();
-        if (!data.alfresco || data.alfresco.length === 0) throw new Error("No docker-compose.yaml found");
-        const file = data.alfresco[0];
-        return typeof file === "object" ? file.content : file;
-      } catch (e) {
-        return "";
-      }
-    }
-
-    async function saveDockerCompose(content) {
-      try {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            target: "compose",
-            filename: "docker-compose.yaml",
-            data: btoa(unescape(encodeURIComponent(content))),
-          }),
-        });
-        if (!res.ok) throw new Error("Save failed");
-        const r = await res.json();
-        if (!r.success) throw new Error(r.error || "Save failed");
-        return r;
-      } catch (e) {
-        throw e;
-      }
-    }
-
-    async function syncCompose(filename) {
-      const btn = event.target;
-      btn.disabled = true;
-      btn.textContent = "Syncing...";
-      let remoteYaml = "";
-      let fileContent = "";
-      try {
-        if (filename.includes("docker-compose")) {
-          remoteYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/community-compose.yaml";
-        } else if (filename.includes("base.yaml")) {
-          remoteYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/commons/base.yaml";
-        }
-        const res = await fetch(remoteYaml);
-        if (!res.ok) throw new Error(`Failed to fetch remote ${filename}: ${res.status}`);
-        remoteYaml = await res.text();
-        fileContent = await fetchLocalCompose(filename);
-        const remoteServices = parseYamlServices(remoteYaml);
-        const localServices = parseYamlServices(fileContent);
-        let updated = false;
-        const changes = [];
-        const localSvcNames = Object.keys(localServices).sort();
-        const remoteSvcNames = Object.keys(remoteServices).sort();
-        for (const name of localSvcNames) {
-          if (!remoteServices[name]) continue;
-          const localImage = localServices[name].image || "";
-          const remoteImage = remoteServices[name].image || "";
-          if (localImage !== remoteImage) {
-            updated = true;
-            changes.push({ name, localImage, remoteImage });
-          }
-        }
-        if (!updated) {
-          showToast(`All versions in ${filename} are already up to date.`, "success");
-          btn.disabled = false;
-          btn.textContent = "🔄";
-          return;
-        }
-        const overlay = document.getElementById("sync-overlay") || createSyncOverlay();
-        const overlayEl = overlay ? document.getElementById("sync-overlay") : overlay;
-        const outputEl = overlayEl.querySelector("#sync-output");
-        if (overlayEl) overlayEl.classList.remove("hidden");
-        outputEl.textContent = "";
-        let fullYaml = fileContent;
-        let localLineCount = fullYaml.split("\n").length;
-        for (const change of changes) {
-          const remoteFullImage = remoteServices[change.name].image || "";
-          const remoteShort = remoteServices[change.name].image || "";
-          const newImage = normalizeYamlImage(remoteShort);
-          const marker = fullYaml.indexOf("  " + change.name + ":");
-          if (marker === -1) continue;
-          let foundImage = false;
-          let endMarker = -1;
-          for (let i = marker + 1; i < fullYaml.length; i++) {
-            if (fullYaml[i] === "#" && i > marker + 3) {
-              break;
-            }
-            const trimmed = fullYaml.slice(i).trimStart();
-            if (trimmed.startsWith("image:") && !trimmed.startsWith("#") && !trimmed.startsWith("  #")) {
-              foundImage = true;
-              endMarker = i;
-              fullYaml = fullYaml.slice(0, i) + "    " + newImage + "\n" + fullYaml.slice(i);
-              outputEl.textContent += `  ${change.name}: ${change.localImage} → ${newImage}\n`;
-              break;
-            }
-          }
-          if (!foundImage) {
-            outputEl.textContent += `  ${change.name}: No image line found, skipping\n`;
-          }
-        }
-        fullYaml = fullYaml.slice(0, -1) + "\n";
-        const localLineCountOld = fullYaml.split("\n").length;
-        while (localLineCountOld < localLineCount) {
-          fullYaml = fullYaml + "\n";
-          localLineCountOld = fullYaml.split("\n").length;
-        }
-        localStorage.setItem("docker-compose.yaml", fullYaml);
-        overlayEl.querySelector("#sync-output").textContent = outputEl.textContent.trim();
-        if (updated) {
-          await saveDockerCompose(fullYaml);
-          showToast(`${filename.split("/").pop()}: Versions synchronized. Restart services to apply.`, "success");
-          await refreshAll();
-        }
-      } catch (e) {
-        showToast("Sync failed: " + e.message, "error");
-      } finally {
-        if (overlayEl) overlayEl.classList.add("hidden");
-        btn.disabled = false;
-        btn.textContent = "🔄";
-      }
-    }
-
     async function fetchLocalCompose(filename) {
       try {
-        const res = await fetch("/api/local-files");
+        const res = await fetch("/api/compose");
         const data = await res.json();
-        if (!data.compose || data.compose.length === 0) throw new Error("No compose config found");
-        const file = data.compose[0];
-        return typeof file === "object" ? file.content : file;
+        return (data && data[filename]) || "";
       } catch (e) {
         return "";
       }
     }
 
-    function removeFiles(files) {
-      for (const f of files) {
-        try {
-          const file = document.getElementById(`local-file-${f}`);
-          if (file) file.remove();
-        } catch {}
-      }
+    async function saveCompose(filename, content) {
+      const res = await fetch("/api/compose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, content }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const r = await res.json();
+      if (!r.success) throw new Error(r.error || "Save failed");
+      return r;
     }
-  })();
 </script>
   </body>
 </html>

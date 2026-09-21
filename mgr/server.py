@@ -906,6 +906,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 },
             )
 
+        if path == "/api/compose":
+            return send_json(
+                self,
+                {
+                    "docker-compose.yaml": read_file(str(PROJECT_ROOT / "docker-compose.yaml")),
+                    "commons/base.yaml": read_file(str(PROJECT_ROOT / "commons" / "base.yaml")),
+                },
+            )
+
         if path == "/api/local-files":
             detect_containers()
             alfresco_amp_ids = _get_installed_amp_ids(ALFRESCO_CONTAINER, "alfresco")
@@ -997,6 +1006,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             try:
                 ALFRESCO_GLOBAL_PROPERTIES.write_text(new_content)
                 return send_json(self, {"success": True})
+            except Exception as e:
+                return send_json(self, {"error": str(e)}, 500)
+
+        if parsed.path == "/api/compose":
+            filename = body.get("filename")
+            content = body.get("content")
+            compose_paths = {
+                "docker-compose.yaml": PROJECT_ROOT / "docker-compose.yaml",
+                "commons/base.yaml": PROJECT_ROOT / "commons" / "base.yaml",
+            }
+            if filename not in compose_paths or content is None:
+                return send_json(self, {"error": "filename and content required"}, 400)
+            try:
+                compose_paths[filename].write_text(content)
+                return send_json(self, {"success": True, "filename": filename})
             except Exception as e:
                 return send_json(self, {"error": str(e)}, 500)
 
