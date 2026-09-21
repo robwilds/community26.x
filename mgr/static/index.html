@@ -1007,9 +1007,19 @@
           Content
         </div>
         <div class="tab" onclick="switchTab('files', 'share', this)">Share</div>
+        <div class="tab" onclick="switchTab('files', 'compose', this)">Compose Config</div>
       </div>
       <div id="files-alfresco" class="tab-content active"></div>
       <div id="files-share" class="tab-content"></div>
+      <div id="files-compose" class="tab-content">
+      <div class="file-list">
+        <!-- Compose files will be rendered here -->
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <input type="file" id="file-input-compose" accept=".yaml,.yml" style="display:none" onchange="uploadComposeFile('commons/base.yaml')">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-compose').click()">Upload File</button>
+      </div>
+    </div></div>
     </div>
 
     <div class="grid">
@@ -1680,6 +1690,9 @@ let pendingRestartContainer = null;
           const key = svc === "alfresco" ? "content" : "share";
           renderFiles(svc, data[key] || []);
         }
+        if (data.compose && data.compose.length > 0) {
+          renderComposeFiles(data.compose);
+        }
       }
 
       function renderFiles(svc, files) {
@@ -1747,6 +1760,38 @@ let pendingRestartContainer = null;
       <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-${key}').click()">Upload File</button>
       <button class="btn btn-primary btn-sm" onclick="installAll('${svc}')"${!dockerReady || !containersRunning || allInstallableInstalled ? ' disabled' : ''}${allInstallableInstalled && !(!dockerReady || !containersRunning) ? ' title="All files already installed"' : ''}>Install All</button>
     </div>`;
+        el.innerHTML = html;
+      }
+
+      async function renderComposeFiles(files) {
+        const el = document.getElementById("files-compose");
+        let html = '<div class="file-list">';
+        let hasEditable = false;
+        let allUpToDate = true;
+        if (files.length === 0) {
+          html += '<div class="empty">No compose config files found</div>';
+        } else {
+          const remoteYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/community-compose.yaml";
+          const remoteBaseYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/commons/base.yaml";
+          for (const entry of files) {
+            const name = typeof entry === "string" ? entry : entry.name;
+            const content = typeof entry === "object" ? entry.content : "";
+            const needsUpdate = entry.needs_update !== false;
+            hasEditable = true;
+            if (!needsUpdate) {
+              allUpToDate = false;
+            }
+            const statusBadge = needsUpdate
+              ? '<span class="badge not-found" style="margin-right:6px">Needs update</span>'
+              : '<span class="badge healthy">Up to date</span>';
+            html += `<span class="file-item">
+        <span>${statusBadge}</span>
+        <span>${esc(name)}</span>
+        <button class="btn btn-primary btn-sm" onclick="syncCompose('${name}')" title="Sync from remote template">🔄</button>
+      </span>`;
+          }
+        }
+        html += "</div>";
         el.innerHTML = html;
       }
 
@@ -1871,6 +1916,41 @@ let pendingRestartContainer = null;
             }
           } catch (err) {
             showToast("upload failed", "error");
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function uploadComposeFile(filename) {
+        const input = document.getElementById(`file-input-compose`);
+        const file = input.files[0];
+        if (!file) return;
+        const btn = input.parentElement.querySelector(".btn");
+        btn.disabled = true;
+        btn.textContent = "Uploading...";
+        const reader = new FileReader();
+        reader.onload = async function (e) {
+          const data = e.target.result.split(",")[1];
+          try {
+            const res = await api("/api/upload", {
+              method: "POST",
+              body: JSON.stringify({
+                target: "compose",
+                filename: filename,
+                data: data,
+              }),
+            });
+            if (res.success) {
+              showToast(`${file.name} uploaded`, "success");
+              await refreshFiles();
+            } else {
+              showToast(res.error || "upload failed", "error");
+            }
+          } catch (err) {
+            showToast("upload failed", "error");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Upload";
           }
         };
         reader.readAsDataURL(file);
@@ -2291,6 +2371,7 @@ waitingForAlfresco = true;
       }
       async function refreshAll() {
         await doRefresh();
+        await refreshFiles();
         showToast("Refreshed", "success");
       }
 
@@ -2683,7 +2764,7 @@ waitingForAlfresco = true;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            target: "alfresco",
+            target: "compose",
             filename: "docker-compose.yaml",
             data: btoa(unescape(encodeURIComponent(content))),
           }),
@@ -2696,6 +2777,119 @@ waitingForAlfresco = true;
         throw e;
       }
     }
+
+    async function syncCompose(filename) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = "Syncing...";
+      let remoteYaml = "";
+      let fileContent = "";
+      try {
+        if (filename.includes("docker-compose")) {
+          remoteYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/community-compose.yaml";
+        } else if (filename.includes("base.yaml")) {
+          remoteYaml = "https://raw.githubusercontent.com/Alfresco/acs-deployment/master/docker-compose/commons/base.yaml";
+        }
+        const res = await fetch(remoteYaml);
+        if (!res.ok) throw new Error(`Failed to fetch remote ${filename}: ${res.status}`);
+        remoteYaml = await res.text();
+        fileContent = await fetchLocalCompose(filename);
+        const remoteServices = parseYamlServices(remoteYaml);
+        const localServices = parseYamlServices(fileContent);
+        let updated = false;
+        const changes = [];
+        const localSvcNames = Object.keys(localServices).sort();
+        const remoteSvcNames = Object.keys(remoteServices).sort();
+        for (const name of localSvcNames) {
+          if (!remoteServices[name]) continue;
+          const localImage = localServices[name].image || "";
+          const remoteImage = remoteServices[name].image || "";
+          if (localImage !== remoteImage) {
+            updated = true;
+            changes.push({ name, localImage, remoteImage });
+          }
+        }
+        if (!updated) {
+          showToast(`All versions in ${filename} are already up to date.`, "success");
+          btn.disabled = false;
+          btn.textContent = "🔄";
+          return;
+        }
+        const overlay = document.getElementById("sync-overlay") || createSyncOverlay();
+        const overlayEl = overlay ? document.getElementById("sync-overlay") : overlay;
+        const outputEl = overlayEl.querySelector("#sync-output");
+        if (overlayEl) overlayEl.classList.remove("hidden");
+        outputEl.textContent = "";
+        let fullYaml = fileContent;
+        let localLineCount = fullYaml.split("\n").length;
+        for (const change of changes) {
+          const remoteFullImage = remoteServices[change.name].image || "";
+          const remoteShort = remoteServices[change.name].image || "";
+          const newImage = normalizeYamlImage(remoteShort);
+          const marker = fullYaml.indexOf("  " + change.name + ":");
+          if (marker === -1) continue;
+          let foundImage = false;
+          let endMarker = -1;
+          for (let i = marker + 1; i < fullYaml.length; i++) {
+            if (fullYaml[i] === "#" && i > marker + 3) {
+              break;
+            }
+            const trimmed = fullYaml.slice(i).trimStart();
+            if (trimmed.startsWith("image:") && !trimmed.startsWith("#") && !trimmed.startsWith("  #")) {
+              foundImage = true;
+              endMarker = i;
+              fullYaml = fullYaml.slice(0, i) + "    " + newImage + "\n" + fullYaml.slice(i);
+              outputEl.textContent += `  ${change.name}: ${change.localImage} → ${newImage}\n`;
+              break;
+            }
+          }
+          if (!foundImage) {
+            outputEl.textContent += `  ${change.name}: No image line found, skipping\n`;
+          }
+        }
+        fullYaml = fullYaml.slice(0, -1) + "\n";
+        const localLineCountOld = fullYaml.split("\n").length;
+        while (localLineCountOld < localLineCount) {
+          fullYaml = fullYaml + "\n";
+          localLineCountOld = fullYaml.split("\n").length;
+        }
+        localStorage.setItem("docker-compose.yaml", fullYaml);
+        overlayEl.querySelector("#sync-output").textContent = outputEl.textContent.trim();
+        if (updated) {
+          await saveDockerCompose(fullYaml);
+          showToast(`${filename.split("/").pop()}: Versions synchronized. Restart services to apply.`, "success");
+          await refreshAll();
+        }
+      } catch (e) {
+        showToast("Sync failed: " + e.message, "error");
+      } finally {
+        if (overlayEl) overlayEl.classList.add("hidden");
+        btn.disabled = false;
+        btn.textContent = "🔄";
+      }
+    }
+
+    async function fetchLocalCompose(filename) {
+      try {
+        const res = await fetch("/api/local-files");
+        const data = await res.json();
+        if (!data.compose || data.compose.length === 0) throw new Error("No compose config found");
+        const file = data.compose[0];
+        return typeof file === "object" ? file.content : file;
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function removeFiles(files) {
+      for (const f of files) {
+        try {
+          const file = document.getElementById(`local-file-${f}`);
+          if (file) file.remove();
+        } catch {}
+      }
+    }
+  })();
 </script>
   </body>
 </html>

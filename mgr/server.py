@@ -927,6 +927,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     files["share"].append(
                         {"name": f.name, "installed": installed}
                     )
+            # Include commons/base.yaml as "compose" section
+            base_yaml_path = PROJECT_ROOT / "commons" / "base.yaml"
+            if base_yaml_path.exists():
+                content = base_yaml_path.read_text()
+                files["compose"] = [{"name": "commons/base.yaml", "content": content, "installed": False}]
             return send_json(self, files)
 
         if path == "/api/services":
