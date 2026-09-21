@@ -964,6 +964,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             lines = fetch_logs(cid)
             return send_json(self, {"service": service, "logs": lines})
 
+        if parsed.path == "/api/update-compose":
+            import subprocess
+            try:
+                # Run the update script
+                r = subprocess.run(["python3", str(PROJECT_ROOT / "mgr" / "update_compose.py")], capture_output=True, text=True)
+                if r.returncode == 0:
+                    return send_json(self, {"success": True, "message": r.stdout})
+                else:
+                    return send_json(self, {"success": False, "error": r.stderr or r.stdout}, 500)
+            except Exception as e:
+                return send_json(self, {"success": False, "error": str(e)}, 500)
+
         send_json(self, {"error": "not found"}, 404)
 
     def do_POST(self):
