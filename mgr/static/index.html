@@ -337,7 +337,6 @@
       }
       .diff-old {
         color: var(--red);
-        text-decoration: line-through;
         word-break: break-all;
       }
       .diff-new {
@@ -2668,9 +2667,9 @@ waitingForAlfresco = true;
         const rows = [];
         for (const name of Object.keys(localServices).sort()) {
           if (!remoteServices[name]) continue;
-          const localImage = localServices[name].image || "";
+          const localImage = normalizeYamlImage(localServices[name].image || "");
           const remoteImage = remoteServices[name].image || "";
-          if (localImage === remoteImage) continue;
+          if (localImage === normalizeYamlImage(remoteImage)) continue;
           const newImage = normalizeYamlImage(remoteImage);
           let svcIndex = -1;
           let imageIndex = -1;
