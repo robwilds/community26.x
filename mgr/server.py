@@ -6,6 +6,7 @@ import shlex
 import subprocess
 import tempfile
 import threading
+import time
 import urllib.parse
 import zipfile
 from pathlib import Path
@@ -16,6 +17,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 PROJECT_ROOT = Path(__file__).parent.parent
 COMPOSE_DIR = PROJECT_ROOT
 TRACKED_JARS_FILE = Path(__file__).parent / "data" / "installed_jars.json"
+COMPOSE_ROLLBACK_FILE = Path(__file__).parent / "data" / "compose_rollback.json"
+COMPOSE_PATHS = {
+    "docker-compose.yaml": PROJECT_ROOT / "docker-compose.yaml",
+    "commons/base.yaml": PROJECT_ROOT / "commons" / "base.yaml",
+}
 ALFRESCO_GLOBAL_PROPERTIES = PROJECT_ROOT / "data" / "services" / "content" / "alfresco-global.properties"
 DEFAULT_MMT_JAR = "/usr/local/tomcat/alfresco-mmt/alfresco-mmt-26.2.0.96.jar"
 
@@ -227,6 +233,58 @@ def untrack_jar_remove(svc, filename):
     if filename in data.get(svc, []):
         data[svc].remove(filename)
         save_tracked_jars(data)
+
+
+def _load_rollback_journal():
+    if COMPOSE_ROLLBACK_FILE.exists():
+        try:
+            return json.loads(COMPOSE_ROLLBACK_FILE.read_text())
+        except Exception:
+            pass
+    return []
+
+
+def _save_rollback_journal(entries):
+    COMPOSE_ROLLBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    COMPOSE_ROLLBACK_FILE.write_text(json.dumps(entries, indent=2))
+
+
+def _append_rollback_entry(filename, prev_content, changes):
+    entries = _load_rollback_journal()
+    entries.append(
+        {
+            "id": "r%d" % int(time.time() * 1000),
+            "filename": filename,
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "prevContent": prev_content,
+            "changes": changes,
+        }
+    )
+    _save_rollback_journal(entries[-20:])
+
+
+def _find_service_image_line(lines, service):
+    """Return the index of the `image:` line for a service block, or None."""
+    svc_index = None
+    for i, line in enumerate(lines):
+        if line == "  %s:" % service:
+            svc_index = i
+            break
+    if svc_index is None:
+        return None
+    for i in range(svc_index + 1, len(lines)):
+        line = lines[i]
+        if line and not line.startswith(" "):
+            break
+        if line.startswith("    image:"):
+            return i
+    return None
+
+
+def _normalize_image_ref(image):
+    if image.startswith("docker.io/"):
+        return image[len("docker.io/"):]
+    return image
 
 def backfill_tracked_jars():
     """Check installs/ dir for JARs already present in containers and add to tracking."""
@@ -907,13 +965,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             )
 
         if path == "/api/compose":
-            return send_json(
-                self,
-                {
-                    "docker-compose.yaml": read_file(str(PROJECT_ROOT / "docker-compose.yaml")),
-                    "commons/base.yaml": read_file(str(PROJECT_ROOT / "commons" / "base.yaml")),
-                },
-            )
+            data = {}
+            for name, p in COMPOSE_PATHS.items():
+                data[name] = read_file(str(p)) or ""
+            return send_json(self, data)
+
+        if path == "/api/rollback":
+            return send_json(self, _load_rollback_journal())
 
         if path == "/api/local-files":
             detect_containers()
@@ -1012,15 +1070,88 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if parsed.path == "/api/compose":
             filename = body.get("filename")
             content = body.get("content")
-            compose_paths = {
-                "docker-compose.yaml": PROJECT_ROOT / "docker-compose.yaml",
-                "commons/base.yaml": PROJECT_ROOT / "commons" / "base.yaml",
-            }
-            if filename not in compose_paths or content is None:
+            if filename not in COMPOSE_PATHS or content is None:
                 return send_json(self, {"error": "filename and content required"}, 400)
             try:
-                compose_paths[filename].write_text(content)
+                prev_content = read_file(str(COMPOSE_PATHS[filename])) or ""
+                changes = body.get("changes")
+                if isinstance(changes, list):
+                    changes = [
+                        {
+                            "service": str(c["service"]),
+                            "before": str(c["before"]),
+                            "after": str(c["after"]),
+                        }
+                        for c in changes
+                        if isinstance(c, dict)
+                        and c.get("service")
+                        and c.get("before") is not None
+                        and c.get("after") is not None
+                    ]
+                else:
+                    changes = []
+                if prev_content != content:
+                    _append_rollback_entry(filename, prev_content, changes)
+                COMPOSE_PATHS[filename].write_text(content)
                 return send_json(self, {"success": True, "filename": filename})
+            except Exception as e:
+                return send_json(self, {"error": str(e)}, 500)
+
+        if parsed.path == "/api/rollback":
+            entry_id = body.get("id")
+            if not entry_id:
+                return send_json(self, {"error": "id required"}, 400)
+            entries = _load_rollback_journal()
+            entry = next((e for e in entries if e.get("id") == entry_id), None)
+            if not entry:
+                return send_json(self, {"error": "rollback entry not found"}, 404)
+            path = COMPOSE_PATHS.get(entry.get("filename"))
+            if not path:
+                return send_json(self, {"error": "unknown filename in entry"}, 400)
+            try:
+                services = body.get("services")
+                if not services:
+                    path.write_text(entry.get("prevContent") or "")
+                    applied = [c["service"] for c in entry.get("changes", [])]
+                    entries.remove(entry)
+                    _save_rollback_journal(entries)
+                    return send_json(
+                        self,
+                        {
+                            "success": True,
+                            "file": entry["filename"],
+                            "applied": applied,
+                            "skipped": [],
+                        },
+                    )
+                lines = (read_file(str(path)) or "").split("\n")
+                changes_by_service = {c["service"]: c for c in entry.get("changes", [])}
+                applied = []
+                skipped = []
+                for service in services:
+                    change = changes_by_service.get(service)
+                    idx = _find_service_image_line(lines, service)
+                    if not change or idx is None:
+                        skipped.append(service)
+                        continue
+                    lines[idx] = "    image: %s" % change["before"]
+                    applied.append(service)
+                path.write_text("\n".join(lines).rstrip("\n") + "\n")
+                remaining = [c for c in entry.get("changes", []) if c["service"] not in applied]
+                if remaining:
+                    entry["changes"] = remaining
+                else:
+                    entries.remove(entry)
+                _save_rollback_journal(entries)
+                return send_json(
+                    self,
+                    {
+                        "success": True,
+                        "file": entry["filename"],
+                        "applied": applied,
+                        "skipped": skipped,
+                    },
+                )
             except Exception as e:
                 return send_json(self, {"error": str(e)}, 500)
 

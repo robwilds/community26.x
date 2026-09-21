@@ -63,6 +63,22 @@ Upload:
 - **Upload File** button opens a file picker; any file type is accepted
 - After upload, a `confirm()` dialog asks if you want to install `.jar` / `.amp` files immediately
 
+### Sync Versions from Remote Templates
+
+The header **🔄 Update Versions** button compares your local `docker-compose.yaml` against the latest Alfresco `community-compose.yaml` template. The **Compose Config** tab in **Available Files** does the same for `commons/base.yaml`, with a **Sync base.yaml** / **Sync docker-compose.yaml** quick button for each.
+
+- Services are matched by name; only the `image:` line of each matching service is eligible for update. Local-only services (e.g. `dozzle`, `open-webui`, `ldap`) are never touched.
+- A side-by-side diff dialog opens showing **Service | Local (current) | Remote (new)**, with the current version in red and the new version in green.
+- Each row has a checkbox (selected by default). Click **Apply Selected** to write only the chosen services' image lines back to the file.
+- After saving, restart the affected services to apply the new images.
+- `docker.io/` prefixes are ignored when comparing, so identical images are not flagged as different.
+
+Rollback:
+
+- Every saved change is recorded in `mgr/data/compose_rollback.json` with a full content snapshot plus the per-service before/after versions (last 20 entries kept).
+- The Compose Config tab's **↩ Rollback** button opens a history list showing each change as `service: before → after`. Roll back a single service or all changes in an entry; a partially reverted entry keeps its remaining items for later.
+- Rollback always locates the service's `image:` line in the *current* file, so it stays correct even if you hand-edit the YAML in between.
+
 ### AMPs Panel
 
 Alfresco and Share tabs, plus an **All Services** tab aggregating both. Each tab shows:
@@ -137,6 +153,7 @@ While waiting for Alfresco to become healthy (e.g., during start or restart), an
 - **JAR tracking**: Only JARs installed through the UI are removable. Persisted to `mgr/data/installed_jars.json`.
 - **Background pull**: `docker compose pull` runs in a background threading with line-by-line streaming. State tracked via `_pull_state` dict protected by `_pull_lock`.
 - **Delete path validation**: `/api/delete-file` resolves the path and verifies it's within `installs/` to prevent directory traversal.
+- **Version sync**: `GET /api/compose` returns `docker-compose.yaml` and `commons/base.yaml`; `POST /api/compose` writes either of those filenames (whitelisted) back to disk. The frontend (`syncComposeFile`) fetches the upstream Alfresco `community-compose.yaml` / `commons/base.yaml` templates, diffs the `image:` lines of name-matched services, renders a selectable diff table, and writes only the applied rows. Every write snapshots the previous content (plus per-service before/after refs) into `mgr/data/compose_rollback.json`. `GET /api/rollback` lists that journal; `POST /api/rollback` restores a single service by name or reverts the whole snapshot.
 - **Auto-refresh**: 5s cycle; accelerates to 1s during pending start/stop/restart actions via `startFastRefreshUntil()`; `pendingAction` resolves when all appropriate services reach target state.
 - **Container detection**: `detect_containers()` uses `docker compose ps -q` + `docker inspect` to discover actual container names (project-name agnostic).
 - **Start error reporting**: `do_start()` runs `docker compose up -d` as a batch, but on failure inspects `docker compose ps --format json` post-attempt to report per-service results — services that started are marked `"started"`, only failed services get the Docker error message.

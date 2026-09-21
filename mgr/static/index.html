@@ -1055,6 +1055,7 @@
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-compose').click()">Upload File</button>
           <button class="btn btn-primary btn-sm" onclick="syncComposeFile('commons/base.yaml')">🔄 Sync base.yaml</button>
           <button class="btn btn-primary btn-sm" onclick="syncComposeFile('docker-compose.yaml')">🔄 Sync docker-compose.yaml</button>
+          <button class="btn btn-outline btn-sm" onclick="openRollbackList()" title="Revert previously applied version changes">↩ Rollback</button>
         </div>
       </div>
     </div>
@@ -2671,18 +2672,8 @@ waitingForAlfresco = true;
           const remoteImage = remoteServices[name].image || "";
           if (localImage === normalizeYamlImage(remoteImage)) continue;
           const newImage = normalizeYamlImage(remoteImage);
-          let svcIndex = -1;
-          let imageIndex = -1;
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i] === `  ${name}:`) { svcIndex = i; break; }
-          }
-          if (svcIndex !== -1) {
-            for (let i = svcIndex + 1; i < lines.length; i++) {
-              if (/^\S/.test(lines[i])) break;
-              if (/^    image:/.test(lines[i])) { imageIndex = i; break; }
-            }
-          }
-          rows.push({ name, localImage, remoteImage: newImage, svcIndex, imageIndex });
+          const imageIndex = findServiceImageLine(lines, name);
+          rows.push({ name, localImage, remoteImage: newImage, imageIndex });
         }
 
         if (rows.length === 0) {
@@ -2707,6 +2698,19 @@ waitingForAlfresco = true;
         btn.disabled = false;
         btn.textContent = origLabel;
       }
+    }
+
+    function findServiceImageLine(lines, name) {
+      let svcIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i] === `  ${name}:`) { svcIndex = i; break; }
+      }
+      if (svcIndex === -1) return -1;
+      for (let i = svcIndex + 1; i < lines.length; i++) {
+        if (/^\S/.test(lines[i])) break;
+        if (/^    image:/.test(lines[i])) return i;
+      }
+      return -1;
     }
 
     function renderSyncDiff(overlay) {
@@ -2750,13 +2754,15 @@ waitingForAlfresco = true;
       try {
         const lines = [...state.linesYaml.split("\n")];
         const applied = [];
+        const changes = [];
         for (const row of state.rows) {
           if (!checked.includes(row.name) || row.imageIndex === -1) continue;
           lines[row.imageIndex] = `    image: ${row.remoteImage}`;
           applied.push(row.name);
+          changes.push({ service: row.name, before: row.localImage, after: row.remoteImage });
         }
         const fullYaml = lines.join("\n").replace(/\n+$/, "") + "\n";
-        await saveCompose(state.filename, fullYaml);
+        await saveCompose(state.filename, fullYaml, changes);
 
         const applyBtn = overlay.querySelector("#sync-apply");
         applyBtn.classList.add("hidden");
@@ -2834,6 +2840,97 @@ waitingForAlfresco = true;
       if (overlay) overlay.classList.add("hidden");
     }
 
+    async function openRollbackList() {
+      let overlay = document.getElementById("rollback-overlay") || createRollbackOverlay();
+      overlay.classList.remove("hidden");
+      const listEl = overlay.querySelector("#rollback-list");
+      listEl.innerHTML = '<div class="empty">Loading rollback history…</div>';
+      overlay.querySelector("#rollback-note").textContent = "";
+      try {
+        const res = await fetch("/api/rollback");
+        const entries = await res.json();
+        await renderRollbackList(overlay, entries);
+      } catch (e) {
+        listEl.innerHTML = `<div class="empty">Failed to load rollback history: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function createRollbackOverlay() {
+      const overlay = document.createElement("div");
+      overlay.className = "docker-overlay hidden";
+      overlay.id = "rollback-overlay";
+      overlay.innerHTML = '<div class="modal" style="max-width:760px;text-align:left"><h2 style="text-align:center">↩ Rollback Version Changes</h2><p style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px">Revert image changes previously applied by the version sync.</p><div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px" id="rollback-list"></div><p id="rollback-note" style="text-align:center;color:var(--muted);font-size:11px;margin:10px 0 6px"></p><div style="display:flex;justify-content:center;gap:8px;margin-top:12px"><button class="btn btn-outline btn-sm" onclick="dismissRollbackOverlay()">Close</button></div></div>';
+      document.body.appendChild(overlay);
+      return overlay;
+    }
+
+    function dismissRollbackOverlay() {
+      const overlay = document.getElementById("rollback-overlay");
+      if (overlay) overlay.classList.add("hidden");
+    }
+
+    async function renderRollbackList(overlay, entries) {
+      const listEl = overlay.querySelector("#rollback-list");
+      if (!entries || entries.length === 0) {
+        listEl.innerHTML = '<div class="empty">No version changes recorded. Apply a sync first.</div>';
+        return;
+      }
+      let html = "";
+      for (const entry of entries) {
+        const changes = entry.changes || [];
+        const summary = changes.length
+          ? `${changes.length} service image(s)`
+          : "full file restore";
+        html += `<div style="margin:10px">
+          <div class="diff-name">${esc(entry.filename)} <span class="muted" style="font-weight:400;font-size:11px">· ${esc(entry.ts || "")} · ${summary}</span></div>`;
+        if (changes.length) {
+          html += `<table class="diff-table"><tbody>`;
+          for (const c of changes) {
+            html += `<tr class="diff-row">
+              <td class="diff-name">${esc(c.service)}</td>
+              <td><span class="diff-old mono">${esc(c.before)}</span></td>
+              <td><span class="diff-new mono">${esc(c.after)}</span></td>
+              <td style="text-align:right"><button class="btn btn-outline btn-sm" onclick="rollbackEntry('${entry.id}', '${esc(c.service)}')">Rollback</button></td>
+            </tr>`;
+          }
+          html += `</tbody></table>`;
+        }
+        html += `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+          <button class="btn btn-primary btn-sm" onclick="rollbackEntry('${entry.id}')">Rollback All</button>
+        </div></div>`;
+        if (entry !== entries[entries.length - 1]) html += '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
+      }
+      listEl.innerHTML = html;
+    }
+
+    async function rollbackEntry(id, service) {
+      const Btn = event.target;
+      const orig = Btn ? Btn.textContent : "";
+      if (Btn) {
+        Btn.disabled = true;
+        Btn.textContent = "Rolling back…";
+      }
+      try {
+        const res = await fetch("/api/rollback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(service ? { id, services: [service] } : { id }),
+        });
+        const r = await res.json();
+        if (!res.ok || !r.success) throw new Error(r.error || "Rollback failed");
+        const target = service ? service : "all changes";
+        showToast(`${target}: rolled back in ${r.file}`, "success");
+        if (r.skipped && r.skipped.length) {
+          showToast(`Skipped ${r.skipped.join(", ")} (image line not found)`, "error");
+        }
+        await refreshFiles();
+        await openRollbackList();
+      } catch (e) {
+        if (Btn) Btn.disabled = false;
+        showToast("Rollback failed: " + e.message, "error");
+      }
+    }
+
     async function fetchLocalCompose(filename) {
       try {
         const res = await fetch("/api/compose");
@@ -2844,11 +2941,11 @@ waitingForAlfresco = true;
       }
     }
 
-    async function saveCompose(filename, content) {
+    async function saveCompose(filename, content, changes) {
       const res = await fetch("/api/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, content }),
+        body: JSON.stringify({ filename, content, changes }),
       });
       if (!res.ok) throw new Error("Save failed");
       const r = await res.json();
