@@ -2,6 +2,9 @@
 import http.server
 import json
 import os
+import difflib
+import requests
+import difflib
 import shlex
 import subprocess
 import tempfile
@@ -385,7 +388,9 @@ def list_services():
     return result
 
 
+
 def _parse_compose_profiles():
+    """Parse compose profiles into a dict: profile -> list of services."""
     profiles = {}
     try:
         text = Path(COMPOSE_DIR / "docker-compose.yaml").read_text()
@@ -408,6 +413,37 @@ def _parse_compose_profiles():
     except Exception:
         pass
     return profiles
+
+
+def _compare_base_yaml():
+    """Compare local commons/base.yaml with upstream.
+
+    Returns a tuple (changed: bool, diff: str or None).
+    """
+    local_path = PROJECT_ROOT / "commons" / "base.yaml"
+    if not local_path.exists():
+        return (False, None)
+    try:
+        import yaml
+        local_data = yaml.safe_load(local_path.read_text())
+    except Exception:
+        local_data = None
+    # fetch remote
+    try:
+        resp = requests.get("https://raw.githubusercontent.com/Alfresco/acs-deployment/master/commons/base.yaml")
+        resp.raise_for_status()
+        remote_data = yaml.safe_load(resp.text)
+    except Exception:
+        remote_data = None
+    if local_data == remote_data:
+        return (False, None)
+    # generate diff
+    local_lines = local_path.read_text().splitlines(True)
+    remote_text = resp.text if resp else ""
+    remote_lines = remote_text.splitlines(True)
+    diff = "".join(difflib.unified_diff(local_lines, remote_lines, fromfile="local base.yaml", tofile="remote base.yaml"))
+    return (True, diff)
+
 
 
 def _parse_all_service_names():
@@ -1042,7 +1078,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # Run the update script
                 r = subprocess.run(["python3", str(PROJECT_ROOT / "mgr" / "update_compose.py")], capture_output=True, text=True)
                 if r.returncode == 0:
-                    return send_json(self, {"success": True, "message": r.stdout})
+                    # Store base.yaml content before update
+                    local_path = PROJECT_ROOT / "commons" / "base.yaml"
+                    old_base_content = local_path.read_text() if local_path.exists() else ""
+                    changed, diff = _compare_base_yaml()
+                    if changed:
+                        new_base_content = local_path.read_text()
+                        _append_rollback_entry("commons/base.yaml", old_base_content, [{"service": "base", "before": old_base_content, "after": new_base_content}])
+                    return send_json(self, {"success": True, "message": r.stdout, "base_changed": changed, "base_diff": diff})
                 else:
                     return send_json(self, {"success": False, "error": r.stderr or r.stdout}, 500)
             except Exception as e:

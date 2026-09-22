@@ -1042,21 +1042,12 @@
           Content
         </div>
         <div class="tab" onclick="switchTab('files', 'share', this)">Share</div>
-        <div class="tab" onclick="switchTab('files', 'compose', this)">Compose Config</div>
+        
       </div>
       <div id="files-alfresco" class="tab-content active"></div>
       <div id="files-share" class="tab-content"></div>
-      <div id="files-compose" class="tab-content">
-        <div class="file-list">
-          <!-- Compose files will be rendered here -->
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-          <input type="file" id="file-input-compose" accept=".yaml,.yml" style="display:none" onchange="uploadComposeFile('commons/base.yaml')">
-          <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input-compose').click()">Upload File</button>
-          <button class="btn btn-primary btn-sm" onclick="syncComposeFile('commons/base.yaml')">🔄 Sync base.yaml</button>
-          <button class="btn btn-primary btn-sm" onclick="syncComposeFile('docker-compose.yaml')">🔄 Sync docker-compose.yaml</button>
-          <button class="btn btn-outline btn-sm" onclick="openRollbackList()" title="Revert previously applied version changes">↩ Rollback</button>
-        </div>
+      
+        <!-- Compose config UI removed -->
       </div>
     </div>
 
